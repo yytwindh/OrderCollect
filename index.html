@@ -2564,6 +2564,9 @@ function ocDecodeText(raw){
    기준본(baseline)은 ‘공유 채널이 알고 있는 마지막 상태’다: 내가 발행했거나 원격에서 받은
    상태로 맞추고, 발행 지점 한 곳(publishSync)에서만 diff를 만들어 핸들러들은 건드리지 않는다 */
 var ocBaseline = null, ocLastMts = 0, ocStateLoaded = false;
+/* 이번 실행에서 원격 델타로 실제로 본 항목별 최대 mts — 빈 방에 다시 심을 때
+   이미 방에 있는 항목을 옛 사본으로 덮어쓰지 않기 위한 기록 (심기 참고) */
+var ocSeenRemoteMts = {};
 /* 명단 후퇴 가드용 상태 — ocLocalRosterEdited는 이 기기에서 명단 편집(UI)이 실제로
    있었을 때만 rosterChanged가 세운다. ocBaselineMetaMts는 기준본이 만들어진 시점의
    명단 mts로, 로컬 명단이 병합에서 ‘이긴’ 명단인지 가릴 때 쓴다 (publishSync 가드 참고) */
@@ -2839,6 +2842,11 @@ function ocSeedAllDeltas(){
   var ents = ocEntities(state), list = [];
   OC_COLS.forEach(function(col){
     ents[col].forEach(function(rec){
+      /* 이미 방에 같은 mts 이상으로 들어 있는 항목은 다시 쓰지 않는다 —
+         방이 일부만 비어 있을 때(스냅샷·일부 델타 소실) 심기가 최신 델타를
+         옛 사본으로 덮는 일을 막고, 빠진 항목만 골라 채운다 */
+      var seenM = ocSeenRemoteMts[col + ":" + rec.id];
+      if (typeof seenM === "number" && typeof rec.ent.mts === "number" && rec.ent.mts && seenM >= rec.ent.mts) return;
       if (typeof rec.ent.mts !== "number" || !rec.ent.mts){
         var mts = ocNextMts();
         if (rec.metaLive) state.metaMts = mts; else rec.live.mts = mts;
@@ -3147,7 +3155,11 @@ function ocApplyDelta(col, id, msg){
         if (col !== "meta") return false;
         try {
           var incRoster = sanitizeRoster(msg.ent.roster), curRoster = sanitizeRoster(state.roster);
-          if (JSON.stringify(incRoster) === JSON.stringify(curRoster) || ocRosterLoss(incRoster, curRoster)) return false;
+          /* 거르는 쪽은 ‘들어온 명단이 지금 명단보다 잃는 경우’다:
+             ocRosterLoss(기준, 대상)은 대상이 기준보다 잃었는지를 보므로
+             (curRoster, incRoster) 순서여야 한다. 순서가 뒤집혀 있으면 순수
+             추가 델타가 정확히 걸러져 새 그룹이 영원히 안 보이게 된다 */
+          if (JSON.stringify(incRoster) === JSON.stringify(curRoster) || ocRosterLoss(curRoster, incRoster)) return false;
         } catch(e){ return false; }
         metaGain = true; metaKeepMts = cur.mts || 0;
       }
@@ -3181,6 +3193,10 @@ function handleFsDelta(col, id, raw){
     if (!plain) return;
     var msg = null;
     try { msg = JSON.parse(plain); } catch(e){ return; }
+    if (msg && typeof msg.mts === "number"){
+      var seenKey = col + ":" + id;
+      if (msg.mts > (ocSeenRemoteMts[seenKey] || 0)) ocSeenRemoteMts[seenKey] = msg.mts;
+    }
     /* 첫 진입 구간에서는 델타를 바로 적용하지 않고 모아 둔다 — 스냅샷이 먼저 반영·렌더된
        뒤 ocFlushInitialDeltas가 한 번에 적용한다 (새로고침 개선 2번) */
     if (ocInitialLoad){ ocQueueInitialDelta(col, id, msg); return; }
@@ -3245,7 +3261,16 @@ function hasMeaningfulState(s){
    실제 내용이 있을 때만 심는다 — 빈 기기가 빈 상태를 발행해 기존 데이터를 지울 수 없다 */
 function publishSeed(){
   if (!fsRoomRef || !ocConnAlive()) return;
-  if (ocFromCache && !ocBrokerSynced) return; /* 캐시만으로는 심지 않는다 — 캐시를 새 상태인 양 발행하지 않기 위해서다. Firestore 상태를 받아 병합한 뒤(ocBrokerSynced)에는 심기가 그대로 동작한다 */
+  /* 캐시만으로는 심지 않는 게 원칙이다 — 캐시를 새 상태인 양 발행하지 않기
+     위해서다. 단, 방 문서가 서버에 아예 없음이 확인된 경우(fsSnapKnown &&
+     !fsSnapExists)는 예외다: 덮어쓸 공유 상태 자체가 없고, 심는 항목도 이번
+     실행에서 델타로 본 항목은 건너뛰므로(ocSeedAllDeltas) 빠진 것만 채워진다.
+     이 예외가 없으면 ‘방이 비었는데 모든 기기가 캐시로만 상태를 들고 있는’
+     상황에서 아무도 다시 심지 못해 영원히 빈 방으로 굳는 교착이 된다 —
+     실제로 Firestore 이관 직후 방이 빈 채로 이 가드에 막혀, 캐시가 없는
+     기기(집 데스크탑)는 기본 명단·기본 가게만 보고 캐시가 있는 기기(모바일)만
+     전체를 보는 상태가 됐다 */
+  if (ocFromCache && !ocBrokerSynced && !(fsSnapKnown && !fsSnapExists)) return;
   if (!state.version) state.version = Date.now();
   (async function(){
     if (ocKeyPromise){ try { await ocKeyPromise; } catch(e){} }
@@ -3255,11 +3280,13 @@ function publishSeed(){
     ocRebuildBaseline();
   })();
 }
-/* Firestore 방에 처음 붙었는데 스냅샷 문서가 없을 때(빈 방) 한 번만 심는다 */
+/* Firestore 방에 처음 붙었는데 스냅샷 문서가 없을 때 한 번만 심는다.
+   스냅샷이 없어도 델타 일부가 남아 있을 수 있으므로, 심기는 ‘통째로 덮기’가
+   아니라 이번 실행에서 본 적 없는 항목만 채우는 방식으로 동작한다 */
 function fsSeedCheck(){
   if (seedChecked) return;
   seedChecked = true;
-  if (gotFsState || fsSnapExists) return; /* 이미 공유 상태가 있는 방이면 심지 않는다 */
+  if (gotFsState || fsSnapExists) return; /* 스냅샷이 살아 있는 방이면 심지 않는다 */
   if (hasMeaningfulState(state)) publishSeed();
 }
 /* ---------- Firestore 연결 ----------
@@ -3554,24 +3581,14 @@ function mergeStoreLists(L, R, preferRemote, removedBuiltins){
    되든 합집합이라 시계 오차로 주문이 사라지지는 않는다 */
 function mergeStatesOrders(localRaw, remoteRaw){
   var L = normalizeState(localRaw), R = normalizeState(remoteRaw);
-  var preferRemote = (typeof remoteRaw.version === "number" ? remoteRaw.version : 0) >= (typeof localRaw.version === "number" ? localRaw.version : 0);
-  var base = preferRemote ? R : L, other = preferRemote ? L : R;
-  /* 명단(그룹·하위 파트·인원)은 뼈대와 같은 ‘버전’ 기준으로 고르지 않는다. 버전은
-     ‘마지막으로 뭔가를 만진 시각’이라, 그룹만 만들고 파트는 없던 시점의 체크포인트
-     스냅샷이 버전만 더 높으면 델타로 도착한 최신 명단(파트·인원 포함)을 이겨 버려
-     그룹은 보이는데 그 안의 파트·인원이 사라진 상태가 되고, 그 합본이 다시 발행돼
-     굳어졌다. 명단은 델타와 같은 기준(metaMts가 큰 쪽)으로 통일한다 — 그룹·파트·
-     인원은 한 덩어리(메타 항목 하나)로 오가므로, 이러면 셋이 갈라질 수 없다 */
-  var rosterWin = (R.metaMts || 0) > (L.metaMts || 0) ? R : (L.metaMts || 0) > (R.metaMts || 0) ? L : base;
-  if ((R.metaMts || 0) === (L.metaMts || 0)){
-    /* metaMts 동률인데 명단 내용이 다르면 인원을 잃지 않는 쪽을 고른다 — 동률에서
-       뼈대(버전=마지막으로 만진 시각)만으로 고르면, 어긋난 사본을 든 기기의 명단이
-       멀쩡한 명단을 밀어내 파트·인원이 통째로 후퇴할 수 있다. 이름 바꾸기처럼
-       인원 총량이 그대로인 차이는 후퇴로 보지 않는다(membersOnly) */
-    if (ocRosterLoss(L.roster, R.roster, true)) rosterWin = L;
-    else if (ocRosterLoss(R.roster, L.roster, true)) rosterWin = R;
-  }
-  base.roster = rosterWin.roster;
+  /* 동기화의 기준은 델타(항목별 mts)다. 스냅샷은 체크포인트(시작점)일 뿐 권위자가
+     아니므로, 스냅샷 병합에서도 ‘버전(version)이 높은 쪽 뼈대를 통째로’ 따르는
+     승자는 없다 — version은 보낸 기기가 마지막으로 뭔가를 만진 시각일 뿐, 항목의
+     새것·옛것과 무관하다. 가게·메뉴·채널·명단 모두 항목 단위로 합집합 병합하고,
+     같은 항목이면 mts가 큰 쪽이 이긴다. 그래서 스냅샷에 아직 안 들어간 항목
+     (델타로만 존재하는 가게·그룹)은 병합에서 떨어지지 않고, 스냅샷보다 최신인
+     로컬 항목(먼저 도착해 적용된 델타)은 항목별 판정이 그대로 지킨다 */
+  var base = L;
   /* 삭제 기록은 양쪽 합집합으로 유지한다 (한쪽에만 남은 삭제 기록이 병합에서
      빠져 지운 가게·메뉴·채널이 되살아나는 일을 막는다) */
   ["removedBuiltins", "removedBuiltinMenus", "removedChannels"].forEach(function(k){
@@ -3579,33 +3596,48 @@ function mergeStatesOrders(localRaw, remoteRaw){
     [L, R].forEach(function(s){ (Array.isArray(s[k]) ? s[k] : []).forEach(function(x){ if (uni.indexOf(x) < 0) uni.push(x); }); });
     base[k] = uni;
   });
-  /* 가게·메뉴는 뼈대 승자만 따르면 델타로만 존재하던 가게가 병합에서 떨어져
-     그 기기에 영원히 안 보이게 되므로, 채널처럼 합집합으로 합친다 */
-  base.stores = mergeStoreLists(L.stores, R.stores, preferRemote, base.removedBuiltins);
-  var otherById = {};
-  other.channels.forEach(function(c){ otherById[c.id] = c; });
-  var seen = {};
-  base.channels.forEach(function(bc){
-    seen[bc.id] = 1;
-    var oc = otherById[bc.id];
-    if (!oc) return;
-    var m = mergeChannelEntries(bc, oc, true);
-    bc.orders = m.orders; bc.skips = m.skips;
-    bc.orderTombs = m.orderTombs; bc.skipTombs = m.skipTombs;
-    bc.ordersClearedAt = m.ordersClearedAt; bc.skipsClearedAt = m.skipsClearedAt;
+  /* 명단(그룹·하위 파트·인원)은 메타 항목 하나로 오가므로 항목 판정 = metaMts
+     비교다. 동률인데 내용이 다르면 인원을 잃지 않는 쪽, 그래도 갈리지 않으면
+     로컬(델타 적용본)을 유지한다 — 버전으로는 절대 가르지 않는다 */
+  var rosterWin = (R.metaMts || 0) > (L.metaMts || 0) ? R : L;
+  if ((R.metaMts || 0) === (L.metaMts || 0)){
+    if (ocRosterLoss(L.roster, R.roster, true)) rosterWin = L;
+    else if (ocRosterLoss(R.roster, L.roster, true)) rosterWin = R;
+  }
+  base.roster = rosterWin.roster;
+  /* 가게·메뉴는 항목별 합집합 (mergeStoreLists 안에서 뼈대·메뉴 모두 mts 판정) */
+  base.stores = mergeStoreLists(L.stores, R.stores, false, base.removedBuiltins);
+  /* 채널도 항목 단위다: 목록은 합집합, 같은 채널의 뼈대(제목·가게·파트 구성)는
+     채널 mts가 큰 쪽, 주문·Skip은 기존처럼 항목 합집합으로 합친다 */
+  var rById = {};
+  R.channels.forEach(function(c){ rById[c.id] = c; });
+  var seen = {}, mergedChannels = [];
+  L.channels.forEach(function(lc){
+    seen[lc.id] = 1;
+    var rc = rById[lc.id];
+    if (!rc){ mergedChannels.push(lc); return; }
+    var skel = (rc.mts || 0) > (lc.mts || 0) ? rc : lc;
+    var m = mergeChannelEntries(lc, rc, true);
+    var ch = ocClone(skel);
+    ch.orders = m.orders; ch.skips = m.skips;
+    ch.orderTombs = m.orderTombs; ch.skipTombs = m.skipTombs;
+    ch.ordersClearedAt = m.ordersClearedAt; ch.skipsClearedAt = m.skipsClearedAt;
+    ch.mts = Math.max(lc.mts || 0, rc.mts || 0);
+    mergedChannels.push(ch);
   });
-  other.channels.forEach(function(oc){
-    if (seen[oc.id]) return;
-    if (base.removedChannels.indexOf(oc.id) >= 0) return; /* 지운 채널은 되살리지 않는다 */
-    base.channels.push(oc);
+  R.channels.forEach(function(rc){
+    if (seen[rc.id]) return;
+    if (base.removedChannels.indexOf(rc.id) >= 0) return; /* 지운 채널은 되살리지 않는다 */
+    mergedChannels.push(rc);
   });
+  base.channels = mergedChannels;
   var first = base.channels[0];
   if (first){
     base.round = { title:first.title, storeId:first.storeId, parts:first.parts, absent:first.absent, limits:first.limits };
     base.orders = first.orders; base.skips = first.skips;
   }
-  /* 동기화 모드(킬스위치)는 명시한 쪽을 우선하고, 최신 뼈대 쪽 값을 따른다 */
-  base.syncMode = (preferRemote ? (R.syncMode || L.syncMode) : (L.syncMode || R.syncMode)) || "delta";
+  /* 동기화 모드(킬스위치)도 메타 항목 소속이라 명단 승자 쪽 값을 따른다 */
+  base.syncMode = (rosterWin === R ? (R.syncMode || L.syncMode) : (L.syncMode || R.syncMode)) || "delta";
   base.metaMts = Math.max(L.metaMts || 0, R.metaMts || 0);
   return base;
 }
@@ -3637,12 +3669,21 @@ function applyRemoteState(raw){
     ocStateLoaded = true;
     ocBrokerSynced = true; /* 이번 실행에서 브로커 스냅샷을 실제로 받았다 — 캐시 발행 가드 해제 기준 */
     ocScanMts(data.state);
-    /* 델타로 받은 최신 수정(mts가 스냅샷 version보다 큰 항목)은 낡은 스냅샷이 덮지 못하게
-       병합 전에 따로 챙겨 뒀다가 병합 결과 위에 다시 얹는다 */
+    /* 델타로 받은 최신 수정은 낡은 스냅샷이 덮지 못하게 병합 전에 따로 챙겨 뒀다가
+       병합 결과 위에 다시 얹는다. 판정은 스냅샷 version(보낸 기기가 마지막으로
+       뭔가를 만진 시각)이 아니라 항목별 mts다 — 스냅샷에 그 항목이 없거나,
+       있어도 스냅샷 속 항목의 mts보다 로컬 항목의 mts가 크면 델타 쪽이 이긴다.
+       예전의 version 비교는 ‘스냅샷이 만들어지기 전에 도착한 델타’를 스냅샷에
+       없다는 이유로 병합에서 통째로 떨어뜨렸다 */
     var stash = [];
     var localEnts = ocEntities(state);
     OC_COLS.forEach(function(col){
-      localEnts[col].forEach(function(rec){ if (typeof rec.ent.mts === "number" && rec.ent.mts > data.version) stash.push(rec); });
+      localEnts[col].forEach(function(rec){
+        if (typeof rec.ent.mts !== "number" || !rec.ent.mts) return;
+        var rent = null;
+        try { rent = ocFindEnt(data.state, col, rec.id); } catch(e){}
+        if (!rent || (rent.mts || 0) < rec.ent.mts) stash.push(rec);
+      });
     });
     var oldFp = stateFingerprint(state);
     var merged = mergeStatesOrders(state, data.state);
