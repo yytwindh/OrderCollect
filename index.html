@@ -390,6 +390,9 @@
          칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시(.pchip .st)가 이름 옆에 붙는다 */
       button.pchip{cursor:pointer}
       button.pchip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+      /* 이름 미선택 제출 시 스크롤로 도착한 ‘이름 선택’ 카드를 잠깐 강조해 도착 지점이 바로 보이게 한다 */
+      #nameSelectCard{scroll-margin-top:12px}
+      #nameSelectCard.flash{box-shadow:0 0 0 3px var(--accent),var(--shadow)}
       .pchip[data-state="pending"]{border-color:var(--line-strong)}
       /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
       .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
@@ -663,7 +666,7 @@
       <section id="view-order" aria-label="주문">
         <div class="order-layout">
           <div class="order-main">
-            <div class="card">
+            <div class="card" id="nameSelectCard">
               <div class="section-head">
                 <div><h2>이름 선택</h2></div>
               </div>
@@ -6542,9 +6545,24 @@ $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModa
 /* 이름 선택은 ‘이름 선택’ 카드의 칩이 맡는다 — 칩 클릭 연결은 renderRoster가 그릴 때마다 붙인다.
    팝업·스트립·취소 버튼은 없다. 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서 한다 */
 
+/* 이름을 안 고른 채 제출·Skip을 누르면 경고와 함께 ‘이름 선택’ 카드로 바로 이동한다 —
+   메뉴를 담느라 아래로 내려간 상태에서도 다시 쭉 올릴 필요 없이 칩을 바로 누를 수 있게 한다 */
+function guideToNameSelect(){
+  toast("먼저 이름을 선택해 주세요.");
+  var el = $("nameSelectCard") || $("nameSelectArea");
+  if (!el) return;
+  var reduce = false;
+  try { reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch(e){}
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  el.classList.add("flash");
+  setTimeout(function(){ el.classList.remove("flash"); }, 1800);
+}
+
 /* 본인 Skip (주문 화면에서 각자) */
 $("skipBtn").addEventListener("click", function(){
-  if (!ui.myName){ toast("먼저 이름을 선택해 주세요."); return; }
+  if (!ui.myName){ guideToNameSelect(); return; }
   if (ui.myKey ? skipOfKey(ui.myKey) : skipOf(ui.myName)){ toast("이미 Skip으로 표시돼 있어요."); updateSkipNote(); return; }
   dropOrdersByPerson(activeChannel(), ui.myName, ui.myKey);
   var skipEntry = { id: uid("skip"), name: ui.myName, group: ui.myPart, ts: Date.now() };
@@ -6554,8 +6572,9 @@ $("skipBtn").addEventListener("click", function(){
 });
 
 $("submitBtn").addEventListener("click", function(){
-  /* 버튼은 항상 눌러 볼 수 있다 — 빠진 게 있으면 그걸 먼저 알려준다 */
-  if (!ui.myName){ toast("먼저 이름을 선택해 주세요."); return; }
+  /* 버튼은 항상 눌러 볼 수 있다 — 빠진 게 있으면 그걸 먼저 알려준다.
+     이름을 안 골랐으면 경고만 띄우지 않고 ‘이름 선택’ 카드 자리로 바로 이동한다 */
+  if (!ui.myName){ guideToNameSelect(); return; }
   if (!roundStore()){ toast("가게가 선택되지 않은 채널이에요. 먼저 가게를 선택해 주세요."); return; }
   if (!syncConnected){ toast(syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…"); return; }
   var items = cartItems();
