@@ -2347,6 +2347,10 @@ function ocFirebaseConfigured(){
    syncConnected를 그대로 쓰므로, 서버 응답 전에는 제출이 차단된 채로 남는다 */
 var fsDb = null, fsRoomId = "", fsRoomRef = null, fsDeltasRef = null;
 var fsListening = false, fsConnected = false, fsConnectedOnce = false;
+/* 리스너별 상태 — 한쪽 리스너의 오류가 다른 쪽까지 죽은 것으로 치지 않게 따로
+   들고, 오류가 나면 그 리스너만 떼었다가 백오프로 다시 붙인다 */
+var fsRoomAlive = false, fsDeltasAlive = false;
+var fsRetryCount = 0, fsRetryTimer = null, fsLastErrCode = "";
 var fsSnapKnown = false, fsSnapExists = false, gotFsState = false, seedChecked = false;
 var fsSeqCounter = 0; /* 방 단위 델타 seq — 수신한 최대값에서 이어 붙이는 단조 증가. 순서·중복 판정의 보조값이고, 실제 멱등은 mts가 맡는다 */
 function ocConnAlive(){ return !!fsDb && ocFirebaseConfigured(); }
@@ -2386,7 +2390,7 @@ function refreshSubmitState(){
    걸리는지 숫자로 가리기 위한 것 — 원인 진단이 끝나도 지우지 않는다 (동호 지시 2026-11-13).
    숫자는 특별한 표시가 없으면 페이지 로드 뒤 흐른 ms(시각)이고, SDK만 대기
    시간(구간 길이)이다. 아직 도달하지 않은 단계는 — 로 남는다 */
-var DIAG_BUILD = "2026-11-13-firestore-1";
+var DIAG_BUILD = "2026-11-13-firestore-2";
 var diagState = { cacheHit:null, cacheMs:null, sdkWaitMs:null, connectMs:null, snapArriveMs:null, snapApplyMs:null, flushMs:null, flushCount:null, firstSyncMs:null };
 function diagNow(){ return Math.round(performance.now()); }
 function diagBrokerLabel(){ return "firestore"; }
@@ -2406,7 +2410,8 @@ function diagRender(){
     + " · 스냅샷 " + v(diagState.snapArriveMs)
     + " · 반영 " + v(diagState.snapApplyMs)
     + " · 델타플러시 " + esc(flushTxt)
-    + " · 동기화 " + v(diagState.firstSyncMs);
+    + " · 동기화 " + v(diagState.firstSyncMs)
+    + (fsLastErrCode ? " · <b>오류 " + esc(fsLastErrCode) + "</b>" : "");
 }
 function diagMarkConnect(){ if (diagState.connectMs == null){ diagState.connectMs = diagNow(); } diagRender(); }
 function diagMarkSnapArrive(){ if (diagState.snapArriveMs == null){ diagState.snapArriveMs = diagNow(); } diagRender(); }
@@ -3184,21 +3189,56 @@ function fsSeedCheck(){
    (IndexedDB 지속성)만으로 연결된 것으로 치지 않아 제출 게이트가 유지된다 */
 function fsNoteServerContact(metadata){
   if (!metadata || metadata.fromCache) return;
+  /* 서버 응답이 실제로 왔다 — 재시도 백오프를 풀고, 오류 표시는 ‘연결 실패’인
+     동안에만 남긴다 (회복되면 다음 오류가 오기 전까지 지운다) */
+  fsRetryCount = 0;
+  if (syncPhase === "failed") fsLastErrCode = "";
   if (!fsConnected){
     fsConnected = true;
     fsConnectedOnce = true;
     setSync("on", "연결됨");
+  } else {
+    diagRender();
   }
 }
-function fsOnListenerError(err){
-  fsListening = false;
-  fsConnected = false;
-  try { console.warn("Firestore listener error", err && err.code ? err.code : err); } catch(e){}
-  setSync("", "연결 실패");
+/* 리스너 오류는 영구 실패가 아니다 — 서버 규칙 거부(permission-denied)나 일시적인
+   네트워크 오류(unavailable)로 리스너가 죽어도, 예전에는 ‘연결 실패’에 그대로
+   박혀 새로고침 전까지 복구가 없었고 어느 쪽 리스너가 왜 죽었는지도 안 보였다.
+   이제는 죽은 리스너만 떼어 표시하고(다른 리스너는 계속 산다), 백오프로 다시
+   붙인다. 서버 쪽에서 규칙이 고쳐지면 새로고침 없이 스스로 ‘연결됨’으로 돌아온다.
+   오류 코드는 진단 표시 끝에 남겨, 다음에 또 실패해도 코드를 보고 원인을 가릴 수
+   있게 한다 */
+function fsOnListenerError(which){
+  return function(err){
+    if (which === "room") fsRoomAlive = false; else fsDeltasAlive = false;
+    fsListening = fsRoomAlive || fsDeltasAlive;
+    if (!fsListening) fsConnected = false; /* 둘 다 죽었으면 더는 ‘연결됨’으로 치지 않는다 — 한쪽만 죽고 다른 쪽이 계속 배달하면 연결은 유지된다 */
+    fsLastErrCode = err && err.code ? String(err.code) : "unknown";
+    try { console.warn("Firestore listener error (" + which + ")", fsLastErrCode); } catch(e){}
+    fsScheduleRetry();
+    if (!fsConnectedOnce) setSync("", "연결 실패");
+    else if (!fsConnected) setSync("busy", "다시 연결하는 중…");
+    else diagRender();
+  };
+}
+/* 죽은 리스너 재부착 백오프 — 3초에서 시작해 60초에서 멈춘다. 살아 있는 리스너가
+   하나라도 있으면 그쪽은 건드리지 않는다 */
+function fsScheduleRetry(){
+  if (fsRetryTimer) return;
+  var delay = Math.min(60000, 3000 * Math.pow(2, Math.min(fsRetryCount, 4)));
+  fsRetryCount++;
+  fsRetryTimer = setTimeout(function(){
+    fsRetryTimer = null;
+    fsAttachListeners();
+    if (!fsRoomAlive || !fsDeltasAlive) fsScheduleRetry(); /* 부착 자체가 실패했으면 계속 시도 */
+  }, delay);
 }
 function fsAttachListeners(){
-  if (!fsDb || !fsRoomRef || fsListening) return;
+  if (!fsDb || !fsRoomRef) return;
+  if (fsRoomAlive && fsDeltasAlive){ fsListening = true; return; }
   fsListening = true;
+  if (!fsRoomAlive){
+  fsRoomAlive = true;
   fsRoomRef.onSnapshot(function(doc){
     fsNoteServerContact(doc.metadata);
     fsSnapKnown = true;
@@ -3215,7 +3255,10 @@ function fsAttachListeners(){
     /* 빈 방이면 첫 동기화 뒤에 심기 검사를 돌린다 */
     if (!seedChecked && !gotFsState) ocPendingSeedCheck = true;
     if (ocFirstSyncDone){ ocProbesScheduled = false; ocScheduleDeferredProbes(); }
-  }, fsOnListenerError);
+  }, fsOnListenerError("room"));
+  }
+  if (!fsDeltasAlive){
+  fsDeltasAlive = true;
   fsDeltasRef.orderBy("seq").onSnapshot(function(qs){
     fsNoteServerContact(qs.metadata);
     qs.docChanges().forEach(function(ch){
@@ -3227,7 +3270,8 @@ function fsAttachListeners(){
         handleFsDelta(d.col, String(d.id), d.payload);
       }
     });
-  }, fsOnListenerError);
+  }, fsOnListenerError("deltas"));
+  }
 }
 function connectRoom(code){
   ui.roomCode = code;
@@ -3512,7 +3556,7 @@ function resyncFromBroker(){
   if (now - lastResyncAt < 30000) return;
   lastResyncAt = now;
   schedulePruneExpiredChannels(); /* 화면으로 돌아올 때도 7일 지난 주문을 정리한다 */
-  if (fsDb && ocFirebaseConfigured() && !fsListening) fsAttachListeners();
+  if (fsDb && ocFirebaseConfigured() && (!fsRoomAlive || !fsDeltasAlive)) fsAttachListeners();
 }
 document.addEventListener("visibilitychange", function(){ if (!document.hidden) resyncFromBroker(); });
 /* 앱이 백그라운드로 가거나 페이지가 내려갈 때는 밀린 발행을 즉시 내보낸다.
