@@ -65,6 +65,12 @@
       @media (prefers-reduced-motion: reduce){ .dot.busy{animation:none} }
       .submit-wrap{position:relative;flex:1 1 200px;display:flex;min-width:0}
       .submit-wrap .btn{flex:1 1 auto;width:100%}
+      /* 장바구니 첫째 줄 — [주문 제출하기]와 [Skip · 주문 안 함]을 같은 선상에 나란히 둔다.
+         좁은 화면에서도 두 버튼이 한 줄을 유지하게 줄바꿈하지 않고 반씩 나눈다 */
+      .cart-action-row{flex-wrap:nowrap}
+      .cart-action-row .submit-wrap{flex:1 1 0}
+      .cart-action-row > .btn{flex:1 1 0;min-width:0}
+      @media (max-width:480px){ .cart-action-row{gap:6px} .cart-action-row .btn{padding-left:10px;padding-right:10px;font-size:13.5px} }
       .submit-blocker{position:absolute;inset:0;z-index:2;border-radius:999px;background:transparent;cursor:not-allowed}
       .submit-blocker:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
       #submitBtn.conn-wait{opacity:.5;filter:saturate(.55)}
@@ -680,10 +686,6 @@
                 <div class="mebar-sum" id="meBarSummary" role="status"></div>
                 <button class="btn small" id="statusViewBtn" type="button">현황 보기</button>
               </div>
-              <div class="btnrow mt">
-                <button class="btn green" id="skipBtn" type="button">Skip</button>
-              </div>
-              <div id="mySkipNote" class="mt hidden"></div>
             </div>
 
             <div class="card">
@@ -709,13 +711,17 @@
               <div id="cartList"></div>
               <div class="totalbar"><span class="t">내 주문 합계</span><span class="v" id="cartTotal">0원</span></div>
               <p class="hint hidden" id="cartLimitNote"></p>
-              <div class="btnrow mt">
+              <div class="btnrow mt cart-action-row">
                 <span class="submit-wrap" id="submitWrap">
                   <button class="btn primary conn-wait" id="submitBtn" type="button" disabled aria-disabled="true">주문 제출하기</button>
                   <span class="submit-blocker" id="submitBlocker" role="button" tabindex="0" aria-label="연결 중이라 아직 주문을 제출할 수 없어요"></span>
                 </span>
+                <button class="btn green" id="skipBtn" type="button">Skip · 주문 안 함</button>
+              </div>
+              <div class="btnrow mt">
                 <button class="btn ghost" id="cartClearBtn" type="button">장바구니 비우기</button>
               </div>
+              <div id="mySkipNote" class="mt hidden"></div>
               <p class="hint" id="submitConnHint" role="status">연결하는 중…</p>
             </div>
 
