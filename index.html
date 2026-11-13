@@ -385,12 +385,21 @@
       }
       @media (min-width:1024px){ .mobile-cart-bar{display:none !important} }
       .order-restore-row{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
-      /* 주문 화면 A안 — 상단 작은 줄(나 + 숫자 요약 + 현황 보기). 긴 이름 칩 그리드를 대신한다 */
+      /* 주문 화면 A안 — 상단 작은 줄(나: 이름 + 내 상태 알약 + 취소·변경). 긴 이름 칩 그리드를 대신한다.
+         전체 인원 숫자 요약과 ‘현황 보기’는 두지 않는다 — 내 상태만 이름 옆 알약으로 보여준다 */
       .mebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
-      .mebar-me{display:flex;align-items:center;gap:8px;flex:none;min-height:42px}
+      .mebar-me{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:42px}
       .mebar-name{font-size:15.5px}
-      .mebar-sum{flex:1 1 auto;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
-      @media (max-width:560px){ .mebar-sum{order:3;flex:1 1 100%;text-align:left} }
+      /* 내 상태 알약 — 주문 완료(초록)·Skip(회색)·아직 안 함(주황). 이름을 고르지 않았으면 보이지 않는다 */
+      .mestatus{display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800;line-height:1.4;white-space:nowrap}
+      .mestatus.ordered{background:var(--green);color:#0C3524}
+      @media (prefers-color-scheme: dark){ .mestatus.ordered{color:#0E241A} }
+      .mestatus.skip{background:var(--chip);color:var(--muted);border:1px solid var(--line-strong)}
+      .mestatus.pending{background:var(--peach);color:#8A4B12}
+      @media (prefers-color-scheme: dark){ .mestatus.pending{color:#F2C49B} }
+      /* 스트립의 취소 버튼 — 내가 주문한 상태일 때만 보인다 (빨간 버튼) */
+      .mebar-cancel{background:var(--danger-solid);border-color:var(--danger-solid);color:#fff}
+      .mebar-cancel:hover{background:var(--danger-solid-hover);border-color:var(--danger-solid-hover)}
       /* 이름 선택 팝업 — 모바일에서도 바텀시트가 아니라 가운데 모달로 뜬다 */
       #personModal{align-items:center;padding:16px}
       #personModal .modal-sheet{border-radius:28px;box-shadow:0 18px 50px rgba(15,118,110,.22)}
@@ -407,8 +416,6 @@
       .pstat.ordered{color:var(--green-text)}
       .pstat.skip{color:var(--muted)}
       .pstat.pending{color:var(--warn-text)}
-      .pcancel{flex:none;border:1px solid var(--danger-line);background:var(--danger-soft);color:var(--danger);
-        border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800;min-height:30px;cursor:pointer}
       /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
       .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
       .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -682,11 +689,11 @@
               <div class="mebar" id="meBar">
                 <div class="mebar-me">
                   <span class="mebar-name" id="meBarName"></span>
+                  <span class="mestatus hidden" id="meBarStatus"></span>
                   <button class="btn primary" id="mePickBtn" type="button">나를 선택해 주세요</button>
+                  <button class="btn small mebar-cancel hidden" id="meCancelBtn" type="button">취소</button>
                   <button class="btn small hidden" id="meChangeBtn" type="button">변경</button>
                 </div>
-                <div class="mebar-sum" id="meBarSummary" role="status"></div>
-                <button class="btn small" id="statusViewBtn" type="button">현황 보기</button>
               </div>
             </div>
 
@@ -797,9 +804,8 @@
 
     </div>
 
-    <!-- 이름 선택 팝업 (A안): 가운데 모달 — 이름을 고르는 곳이자 전체 현황을 보는 곳.
-         줄마다 이름 + 상태(주문한 메뉴는 초록, Skip은 회색, 아직 안 함은 주황)가 보이고,
-         내가 선택한 줄에만 주문 취소 버튼이 붙는다 -->
+    <!-- 이름 선택 팝업 (A안): 가운데 모달 — 이름만 고르는 곳이다 (취소 버튼은 넣지 않는다).
+         줄마다 이름 + 상태(주문한 메뉴는 초록, Skip은 회색, 아직 안 함은 주황)가 보인다 -->
     <div class="modal hidden" id="personModal" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
       <div class="modal-backdrop" id="personModalBackdrop"></div>
       <div class="modal-sheet">
@@ -4679,35 +4685,56 @@ function startNewOrder(){
   enterOrderScreen(target.id);
   toast("주문을 시작했어요. ‘주문 링크 복사’로 카톡에 공유하세요.");
 }
-/* 주문 화면 상단 작은 줄(A안) — 긴 이름 칩 그리드 대신 ‘나 + 숫자 요약 + 현황 보기’ 한 줄만 둔다.
-   이름을 고르는 일과 전체 현황 보기는 이름 선택 팝업(#personModal)이 맡는다 */
+/* 주문 화면 상단 작은 줄(A안) — 긴 이름 칩 그리드 대신 ‘나: 이름 + 내 상태 알약 + 취소·변경’ 한 줄만 둔다.
+   전체 인원 숫자(주문 완료 N · Skip N · 아직 안 함 N)와 ‘현황 보기’는 두지 않는다.
+   이름 옆 알약으로 내 상태만 보여주고(주문 완료=초록, Skip=회색, 아직 안 함=주황),
+   내가 주문한 상태일 때만 빨간 ‘취소’ 버튼이 스트립에 보인다.
+   이름을 고르는 일은 이름 선택 팝업(#personModal)이 맡고, 팝업 안에는 취소 버튼을 두지 않는다 */
+function mySubmittedOrder(){
+  var found = null;
+  activeChannel().orders.forEach(function(o){
+    if (found) return;
+    var mine = o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName);
+    if (mine) found = o;
+  });
+  return found;
+}
 function renderRoster(){
   var nameEl = $("meBarName"); if (!nameEl) return;
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   if ((ui.myName || ui.myKey) && !flat.some(function(p){ return ui.myKey ? p.key===ui.myKey : p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; ui.myKey = ""; }
-  var pickBtn = $("mePickBtn"), changeBtn = $("meChangeBtn"), sumEl = $("meBarSummary");
+  var pickBtn = $("mePickBtn"), changeBtn = $("meChangeBtn"), statusEl = $("meBarStatus"), cancelBtn = $("meCancelBtn");
+  function hideStatusAndCancel(){
+    if (statusEl){ statusEl.classList.add("hidden"); statusEl.textContent = ""; statusEl.className = "mestatus hidden"; }
+    if (cancelBtn) cancelBtn.classList.add("hidden");
+  }
   if (!flat.length){
     nameEl.textContent = "아직 주문이 시작되지 않았어요";
-    if (sumEl) sumEl.textContent = "";
     pickBtn.classList.add("hidden"); changeBtn.classList.add("hidden");
+    hideStatusAndCancel();
     updateSkipNote(); renderPersonList();
     return;
   }
-  var t = totals();
-  if (sumEl) sumEl.textContent = "주문 완료 " + t.people + " · Skip " + t.skips + " · 아직 안 함 " + t.pending;
   if (ui.myName){
     nameEl.innerHTML = "나: <b>" + esc(ui.myName) + "</b>";
     pickBtn.classList.add("hidden"); changeBtn.classList.remove("hidden");
+    var st = personStatusP({ name: ui.myName, key: ui.myKey });
+    if (statusEl){
+      statusEl.classList.remove("hidden", "ordered", "skip", "pending");
+      statusEl.classList.add(st);
+      statusEl.textContent = st === "ordered" ? "주문 완료" : (st === "skip" ? "Skip" : "아직 안 함");
+    }
+    if (cancelBtn) cancelBtn.classList.toggle("hidden", st !== "ordered");
   } else {
     nameEl.textContent = "";
     pickBtn.classList.remove("hidden"); changeBtn.classList.add("hidden");
+    hideStatusAndCancel();
   }
   updateSkipNote();
   renderPersonList();
 }
-/* 이름 선택 팝업 — 그룹 › 파트로 묶인 명단을 한 줄씩 그린다.
-   주문했으면 주문한 메뉴를 초록으로, Skip이면 회색 Skip, 아직 안 했으면 주황 ‘아직 안 함’.
-   내가 선택한 줄(민트색)에만 메뉴 옆에 ‘취소’ 버튼이 붙는다 */
+/* 이름 선택 팝업 — 그룹 › 파트로 묶인 명단을 한 줄씩 그린다. 팝업은 이름만 고르는 곳이라 취소 버튼은 두지 않는다.
+   주문했으면 주문한 메뉴를 초록으로, Skip이면 회색 Skip, 아직 안 했으면 주황 ‘아직 안 함’ */
 function personOrderSummary(o){
   return o.items.map(function(it){ var s = itemSuffix(it); return it.name + (s ? "(" + s + ")" : "") + " ×" + it.qty; }).join(", ");
 }
@@ -4723,8 +4750,7 @@ function renderPersonList(){
     var statusHtml;
     if (st === "ordered"){
       var o = pkey ? orderOfKey(pkey) : orderOf(n);
-      statusHtml = '<span class="pstat ordered">' + esc(o ? personOrderSummary(o) : "주문 완료") + "</span>"
-        + (sel && o ? '<button type="button" class="pcancel" data-pcancel="' + esc(o.id) + '">취소</button>' : "");
+      statusHtml = '<span class="pstat ordered">' + esc(o ? personOrderSummary(o) : "주문 완료") + "</span>";
     } else if (st === "skip"){
       statusHtml = '<span class="pstat skip">Skip</span>';
     } else {
@@ -4747,12 +4773,6 @@ function renderPersonList(){
     return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span></div><div class="roster-group-body">' + inner + "</div></div>";
   }).join("");
   list.innerHTML = html || '<div class="empty"><strong>검색 결과가 없어요</strong></div>';
-  Array.prototype.forEach.call(list.querySelectorAll("[data-pcancel]"), function(b){
-    b.addEventListener("click", function(e){
-      e.stopPropagation();
-      restoreOrderToCart(b.getAttribute("data-pcancel"));
-    });
-  });
   Array.prototype.forEach.call(list.querySelectorAll("[data-prow]"), function(row){
     function pick(){
       ui.myName = row.getAttribute("data-prow");
@@ -6624,10 +6644,15 @@ $("channelCancelBtn").addEventListener("click", function(){ closeChannelModal(tr
 $("channelModalCloseBtn").addEventListener("click", function(){ closeChannelModal(true); });
 $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModal(true); });
 
-/* 이름 선택 팝업 (A안) — ‘나를 선택해 주세요’·‘변경’·‘현황 보기’가 모두 같은 팝업을 연다 */
+/* 이름 선택 팝업 (A안) — ‘나를 선택해 주세요’·‘변경’이 같은 팝업을 연다. 팝업은 이름만 고르는 곳이다 */
 $("mePickBtn").addEventListener("click", function(){ openPersonModal(); });
 $("meChangeBtn").addEventListener("click", function(){ openPersonModal(); });
-$("statusViewBtn").addEventListener("click", function(){ openPersonModal(); });
+/* 스트립의 ‘취소’ — 내가 주문한 상태일 때만 보인다. 누르면 내 제출된 주문이 취소되고 메뉴가 장바구니로 돌아간다 */
+$("meCancelBtn").addEventListener("click", function(){
+  var o = mySubmittedOrder();
+  if (!o) return;
+  restoreOrderToCart(o.id);
+});
 $("personModalCloseBtn").addEventListener("click", function(){ closePersonModal(); });
 $("personModalBackdrop").addEventListener("click", function(){ closePersonModal(); });
 $("personSearch").addEventListener("input", function(){ ui.personQuery = this.value; renderPersonList(); });
