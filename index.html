@@ -3254,7 +3254,7 @@ function fsAttachListeners(){
   fsListening = true;
   if (!fsRoomAlive){
   fsRoomAlive = true;
-  fsUnsubRoom = fsRoomRef.onSnapshot(function(doc){
+  fsUnsubRoom = fsRoomRef.onSnapshot({ includeMetadataChanges: true }, function(doc){
     fsNoteServerContact(doc.metadata);
     fsSnapKnown = true;
     fsSnapExists = !!doc.exists;
@@ -3274,7 +3274,7 @@ function fsAttachListeners(){
   }
   if (!fsDeltasAlive){
   fsDeltasAlive = true;
-  fsUnsubDeltas = fsDeltasRef.orderBy("seq").onSnapshot(function(qs){
+  fsUnsubDeltas = fsDeltasRef.orderBy("seq").onSnapshot({ includeMetadataChanges: true }, function(qs){
     fsNoteServerContact(qs.metadata);
     qs.docChanges().forEach(function(ch){
       if (ch.type === "removed") return;
