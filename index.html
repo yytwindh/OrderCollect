@@ -2351,6 +2351,12 @@ var fsListening = false, fsConnected = false, fsConnectedOnce = false;
    들고, 오류가 나면 그 리스너만 떼었다가 백오프로 다시 붙인다 */
 var fsRoomAlive = false, fsDeltasAlive = false;
 var fsRetryCount = 0, fsRetryTimer = null, fsLastErrCode = "";
+/* 리스너 해제 함수 — 재부착·클라이언트 재시작 때 예전 리스너를 실제로 떼기 위해
+   onSnapshot의 반환값을 들고 있는다 (예전에는 플래그만 내리고 리스너는 남아 있었다) */
+var fsUnsubRoom = null, fsUnsubDeltas = null;
+/* 무응답 감시용 시각·횟수 — 마지막으로 서버 응답이 온 시각과, 리스너를 붙인 시각,
+   그리고 클라이언트 재시작 횟수. 재시작 횟수는 진단 표시에 남는다 */
+var fsLastServerAliveAt = 0, fsListenSinceAt = 0, fsResetCount = 0, fsResetting = false, fsWatchdogTimer = null, fsAppName = null;
 var fsSnapKnown = false, fsSnapExists = false, gotFsState = false, seedChecked = false;
 var fsSeqCounter = 0; /* 방 단위 델타 seq — 수신한 최대값에서 이어 붙이는 단조 증가. 순서·중복 판정의 보조값이고, 실제 멱등은 mts가 맡는다 */
 function ocConnAlive(){ return !!fsDb && ocFirebaseConfigured(); }
@@ -2390,7 +2396,7 @@ function refreshSubmitState(){
    걸리는지 숫자로 가리기 위한 것 — 원인 진단이 끝나도 지우지 않는다 (동호 지시 2026-11-13).
    숫자는 특별한 표시가 없으면 페이지 로드 뒤 흐른 ms(시각)이고, SDK만 대기
    시간(구간 길이)이다. 아직 도달하지 않은 단계는 — 로 남는다 */
-var DIAG_BUILD = "2026-11-13-firestore-2";
+var DIAG_BUILD = "2026-11-13-firestore-3";
 var diagState = { cacheHit:null, cacheMs:null, sdkWaitMs:null, connectMs:null, snapArriveMs:null, snapApplyMs:null, flushMs:null, flushCount:null, firstSyncMs:null };
 function diagNow(){ return Math.round(performance.now()); }
 function diagBrokerLabel(){ return "firestore"; }
@@ -2411,6 +2417,7 @@ function diagRender(){
     + " · 반영 " + v(diagState.snapApplyMs)
     + " · 델타플러시 " + esc(flushTxt)
     + " · 동기화 " + v(diagState.firstSyncMs)
+    + (fsResetCount ? " · 재시작 " + fsResetCount : "")
     + (fsLastErrCode ? " · <b>오류 " + esc(fsLastErrCode) + "</b>" : "");
 }
 function diagMarkConnect(){ if (diagState.connectMs == null){ diagState.connectMs = diagNow(); } diagRender(); }
@@ -3192,6 +3199,7 @@ function fsNoteServerContact(metadata){
   /* 서버 응답이 실제로 왔다 — 재시도 백오프를 풀고, 오류 표시는 ‘연결 실패’인
      동안에만 남긴다 (회복되면 다음 오류가 오기 전까지 지운다) */
   fsRetryCount = 0;
+  fsLastServerAliveAt = Date.now(); /* 무응답 감시의 기준 시각 — 서버가 살아 있다는 증거가 온 때 */
   if (syncPhase === "failed") fsLastErrCode = "";
   if (!fsConnected){
     fsConnected = true;
@@ -3210,7 +3218,7 @@ function fsNoteServerContact(metadata){
    있게 한다 */
 function fsOnListenerError(which){
   return function(err){
-    if (which === "room") fsRoomAlive = false; else fsDeltasAlive = false;
+    if (which === "room"){ fsRoomAlive = false; fsUnsubRoom = null; } else { fsDeltasAlive = false; fsUnsubDeltas = null; }
     fsListening = fsRoomAlive || fsDeltasAlive;
     if (!fsListening) fsConnected = false; /* 둘 다 죽었으면 더는 ‘연결됨’으로 치지 않는다 — 한쪽만 죽고 다른 쪽이 계속 배달하면 연결은 유지된다 */
     fsLastErrCode = err && err.code ? String(err.code) : "unknown";
@@ -3237,9 +3245,10 @@ function fsAttachListeners(){
   if (!fsDb || !fsRoomRef) return;
   if (fsRoomAlive && fsDeltasAlive){ fsListening = true; return; }
   fsListening = true;
+  var attachedAny = false;
   if (!fsRoomAlive){
-  fsRoomAlive = true;
-  fsRoomRef.onSnapshot(function(doc){
+  fsRoomAlive = true; attachedAny = true;
+  fsUnsubRoom = fsRoomRef.onSnapshot(function(doc){
     fsNoteServerContact(doc.metadata);
     fsSnapKnown = true;
     fsSnapExists = !!doc.exists;
@@ -3258,8 +3267,8 @@ function fsAttachListeners(){
   }, fsOnListenerError("room"));
   }
   if (!fsDeltasAlive){
-  fsDeltasAlive = true;
-  fsDeltasRef.orderBy("seq").onSnapshot(function(qs){
+  fsDeltasAlive = true; attachedAny = true;
+  fsUnsubDeltas = fsDeltasRef.orderBy("seq").onSnapshot(function(qs){
     fsNoteServerContact(qs.metadata);
     qs.docChanges().forEach(function(ch){
       if (ch.type === "removed") return;
@@ -3271,6 +3280,68 @@ function fsAttachListeners(){
       }
     });
   }, fsOnListenerError("deltas"));
+  }
+  if (attachedAny) fsListenSinceAt = Date.now(); /* 무응답 감시는 ‘붙인 뒤 무응답’만 센다 */
+}
+/* ---------- 무응답 감시 (연결하는 중에 영영 멈추는 경우) ----------
+   리스너 오류는 백오프 재부착이 맡지만, 오류도 응답도 없이 리스너가 조용히
+   매달리는 경우가 있다 — 다중 탭 지속성(synchronizeTabs)에서 주 탭 역할을 쥔
+   다른 탭이 멈춰 있으면 이 탭의 리스너는 서버 데이터를 대신 받아야 하는데
+   그 전달이 끊겨도 오류가 나지 않고, 회사 프록시가 long-polling 스트림을
+   조용히 붙잡는 경우도 마찬가지다. 증상은 ‘연결하는 중…’만 영영 뜨는 것.
+   그래서 서버 응답이 임계 시간(18초에서 재시작할수록 60초까지)을 넘게 없으면
+   리스너가 살아 있다는 플래그와 무관하게 클라이언트 자체를 갈아끼운다:
+   리스너를 떼고, 지속성을 켜지 않은 새 이름의 앱으로 새 Firestore 클라이언트를
+   만들어 다시 붙인다. 지속성을 끄는 것이 핵심이다 — 주 탭 중재와 IndexedDB를
+   거치지 않으므로 다른 탭 상태에 끌려가지 않고 자기 스트림으로 바로 붙는다.
+   서버 응답이 오면 감시는 조용히 물러나고, 재시작 횟수만 진단에 남는다 */
+function fsStallThresholdMs(){ return Math.min(60000, 18000 + fsResetCount * 10000); }
+function fsStartStallWatchdog(){
+  if (fsWatchdogTimer) return;
+  fsWatchdogTimer = setInterval(function(){
+    if (!fsDb || fsConnected || fsResetting) return;
+    if (!fsRoomAlive && !fsDeltasAlive) return; /* 둘 다 죽어 있으면 오류 재시도 경로가 맡는다 */
+    var base = Math.max(fsLastServerAliveAt, fsListenSinceAt);
+    if (!base) return;
+    if (Date.now() - base < fsStallThresholdMs()) return;
+    fsHardReset();
+  }, 4000);
+}
+function fsHardReset(){
+  if (fsResetting || !fsDb) return;
+  fsResetting = true;
+  fsResetCount++;
+  var oldDb = fsDb, oldAppName = fsAppName;
+  try { if (fsUnsubRoom) fsUnsubRoom(); } catch(e){}
+  try { if (fsUnsubDeltas) fsUnsubDeltas(); } catch(e){}
+  fsUnsubRoom = null; fsUnsubDeltas = null;
+  fsRoomAlive = false; fsDeltasAlive = false; fsListening = false;
+  if (fsRetryTimer){ clearTimeout(fsRetryTimer); fsRetryTimer = null; }
+  fsRetryCount = 0;
+  if (!fsConnectedOnce) setSync("busy", "연결하는 중…"); else setSync("busy", "다시 연결하는 중…");
+  diagRender();
+  try { if (oldDb) oldDb.terminate(); } catch(e){}
+  try {
+    var name = "oc-retry-" + fsResetCount;
+    var app = firebase.initializeApp(FIREBASE_CONFIG, name);
+    fsDb = app.firestore();
+    try { fsDb.settings({ experimentalForceLongPolling: true }); } catch(e){}
+    /* 지속성은 켜지 않는다 — 메모리 캐시로 붙어 다른 탭·IndexedDB 상태와 무관해진다 */
+    fsRoomRef = fsDb.collection("oc_rooms").doc(fsRoomId);
+    fsDeltasRef = fsRoomRef.collection("deltas");
+    fsAppName = name;
+    fsResetting = false;
+    fsAttachListeners();
+    /* 끊겨 있던 동안 쌓인 변경을 새 클라이언트로 한 번 내보낸다 */
+    setTimeout(function(){ publishSync(false); }, 3800);
+    /* 이전 재시작 앱은 새 연결이 붙은 뒤 정리한다 (기본 앱은 지우지 않는다) */
+    if (oldAppName){
+      var stale = oldAppName;
+      setTimeout(function(){ try { var oa = firebase.app(stale); if (oa) oa.delete(); } catch(e){} }, 5000);
+    }
+  } catch(e){
+    fsResetting = false;
+    fsScheduleRetry();
   }
 }
 function connectRoom(code){
@@ -3331,6 +3402,7 @@ function fsInitAndListen(){
   fsRoomRef = fsDb.collection("oc_rooms").doc(fsRoomId);
   fsDeltasRef = fsRoomRef.collection("deltas");
   fsAttachListeners();
+  fsStartStallWatchdog(); /* 응답도 오류도 없이 매달리는 리스너를 감시해 클라이언트를 갈아끼운다 */
   /* 스냅샷도 델타도 끝내 안 오는 빈 방에서는 7초 안전장치가 첫 동기화 완료로 쳐서
      심기 검사가 결국 돌게 한다 */
   setTimeout(function(){ ocMarkFirstSyncDone("timeout"); }, 7000);
