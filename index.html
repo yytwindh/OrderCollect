@@ -107,6 +107,15 @@
       .partblock:first-child{margin-top:2px}
       .partblock > h3{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:8px}
       .partblock > h3 .gsum{color:var(--muted);font-size:13px;font-weight:700}
+      /* 주문 단계 그룹 구분 — 그룹(Media1 등) 제목 아래에 파트 블록을 들여 넣어
+         그룹 › 파트 › 인원 구조가 주문 화면·취합에서도 그대로 보이게 한다 */
+      .roster-group{margin-top:16px}
+      .roster-group:first-child{margin-top:2px}
+      .roster-group-head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:2px}
+      .roster-group-head .gname{font-size:16.5px;font-weight:800;letter-spacing:-.01em}
+      .roster-group-head .gsum{color:var(--muted);font-size:13px;font-weight:700}
+      .roster-group-body{margin:6px 0 2px 6px;padding:2px 0 2px 14px;border-left:2px solid var(--line-strong)}
+      .roster-group-body .partblock:first-child,.roster-group-body .groupblock:first-child{margin-top:2px}
       .pgrid{display:flex;flex-wrap:wrap;gap:8px}
       .pchip{border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:18px;
         padding:7px 12px;font-weight:800;font-size:14.5px;min-height:42px;display:inline-flex;align-items:center;gap:7px}
@@ -1355,29 +1364,72 @@ function validParts(list){
    파트 관리에서 명단을 바꿔도 이미 열린 채널은 그대로). 없으면 현재 파트 명단을 쓴다.
    상위 그룹을 통째로 고르면 ‘그룹에만 있는 사람’이 ‘<그룹> 전용’ 블록으로 따라오고,
    ctx.extras(개별 추가 인원)는 ‘개별 추가’ 블록이 된다. 겹치는 이름은 첫 블록에만 한 번 들어간다. */
+/* 잎(파트) 이름 → 소속 그룹 이름 맵. 이름이 여러 그룹에 겹치면 어느 그룹인지
+   이름만으로 가릴 수 없어 null(구분 불가)로 둔다 — 그 경우 그룹 표시는 비운다 */
+function leafGroupMap(){
+  var a = assignLeaves(LEAF_PART_DEFS, GROUP_PART_DEFS), perLeaf = {}, map = {};
+  Object.keys(a.byGroup).forEach(function(gi){
+    (a.byGroup[gi] || []).forEach(function(li){ perLeaf[li] = GROUP_PART_DEFS[gi].name; });
+  });
+  (a.loose || []).forEach(function(li){ perLeaf[li] = ""; });
+  LEAF_PART_DEFS.forEach(function(l, li){
+    var g = perLeaf[li] || "";
+    if (!(l.name in map)) map[l.name] = g;
+    else if (map[l.name] !== g) map[l.name] = null;
+  });
+  return map;
+}
+/* 명단 블록의 표시용 그룹·파트 분리 — 블록의 part는 내부 키(파트 이름 또는
+   ‘<그룹> 전용’·‘개별 추가’)로 그대로 두고, 화면에서는 group과 함께 보여 준다 */
+function blockDisplay(b){
+  var g = (b && b.group) || "", p = (b && b.part) || "";
+  if (g && p === g + " 전용") return { group: g, sub: "전용" };
+  return { group: g, sub: p };
+}
+function blockTitle(b){
+  var d = blockDisplay(b);
+  return d.group ? d.group + " · " + d.sub : d.sub;
+}
+/* 연속된 같은 그룹 블록을 한 묶음으로 접는다 (그룹 › 파트 2단계 표시용).
+   그룹이 없는 블록은 각자 독립 묶음이 된다 */
+function groupSections(blocks){
+  var secs = [], cur = null;
+  (Array.isArray(blocks) ? blocks : []).forEach(function(b){
+    var d = blockDisplay(b);
+    if (d.group){
+      if (!cur || cur.group !== d.group){ cur = { group: d.group, blocks: [] }; secs.push(cur); }
+      cur.blocks.push(b);
+    } else {
+      cur = null;
+      secs.push({ group: "", blocks: [b] });
+    }
+  });
+  return secs;
+}
 function computeBlocks(parts, ctx){
   ctx = ctx || {};
   var memberMap = ctx.memberMap || null, gex = ctx.groupExtras || null;
   var extras = Array.isArray(ctx.extras) ? ctx.extras : [];
   var expanded = expandParts(parts);
+  var lgMap = leafGroupMap();
   var seen = {}, out = [];
-  function pushBlock(label, names){
+  function pushBlock(label, names, group){
     var ms = [];
     (Array.isArray(names) ? names : []).forEach(function(n){
       if (typeof n === "string" && n && !seen[n]){ seen[n] = 1; ms.push(n); }
     });
-    if (ms.length) out.push({ part: label, members: ms });
+    if (ms.length) out.push({ part: label, group: group || "", members: ms });
   }
   expanded.forEach(function(pn){
     var names = (memberMap && memberMap[pn]) ? memberMap[pn] : (partDef(pn) ? partDef(pn).members : []);
-    pushBlock(pn, names);
+    pushBlock(pn, names, lgMap[pn] || "");
   });
   GROUP_PART_DEFS.forEach(function(g){
     if (groupState(expanded, g.name) === "all"){
-      pushBlock(g.name + " 전용", (gex && gex[g.name]) ? gex[g.name] : groupExtrasOf(g.name));
+      pushBlock(g.name + " 전용", (gex && gex[g.name]) ? gex[g.name] : groupExtrasOf(g.name), g.name);
     }
   });
-  pushBlock("개별 추가", extras);
+  pushBlock("개별 추가", extras, "");
   return out;
 }
 /* 동명이인 구분 목록(ctx.people)으로 명단 블록을 만든다 — 이름이 같아도 지우지 않고
@@ -1389,7 +1441,7 @@ function peopleBlocks(people, absent){
   (Array.isArray(people) ? people : []).forEach(function(p){
     if (!p || typeof p.name !== "string" || !p.name) return;
     if (absent.indexOf(p.name) >= 0) return;
-    if (!cur || cur.part !== (p.part || "")){ cur = { part: p.part || "", members: [], keys: [] }; out.push(cur); }
+    if (!cur || cur.part !== (p.part || "") || cur.group !== (p.group || "")){ cur = { part: p.part || "", group: p.group || "", members: [], keys: [] }; out.push(cur); }
     cur.members.push(p.name); cur.keys.push(p.key || "");
   });
   return out;
@@ -1401,22 +1453,22 @@ function rosterFor(parts, absent, ctx){
   absent = absent || [];
   if (ctx && Array.isArray(ctx.people) && ctx.people.length) return peopleBlocks(ctx.people, absent);
   return computeBlocks(parts, ctx).map(function(b){
-    return { part: b.part, members: b.members.filter(function(n){ return absent.indexOf(n) < 0; }) };
+    return { part: b.part, group: b.group || "", members: b.members.filter(function(n){ return absent.indexOf(n) < 0; }) };
   });
 }
 function rosterFlat(parts, absent, ctx){
   var flat = [];
-  rosterFor(parts, absent, ctx).forEach(function(b){ b.members.forEach(function(n, i){ flat.push({ name:n, part:b.part, key: (b.keys ? b.keys[i] : "") || "" }); }); });
+  rosterFor(parts, absent, ctx).forEach(function(b){ b.members.forEach(function(n, i){ flat.push({ name:n, part:b.part, group:b.group || "", key: (b.keys ? b.keys[i] : "") || "" }); }); });
   return flat;
 }
 function absentInParts(parts, absent, ctx){
   var out = [];
   if (ctx && Array.isArray(ctx.people) && ctx.people.length){
-    ctx.people.forEach(function(p){ if (p && p.name && absent.indexOf(p.name) >= 0) out.push({ name:p.name, part:p.part || "", key:p.key || "" }); });
+    ctx.people.forEach(function(p){ if (p && p.name && absent.indexOf(p.name) >= 0) out.push({ name:p.name, part:p.part || "", group:p.group || "", key:p.key || "" }); });
     return out;
   }
   computeBlocks(parts, ctx).forEach(function(b){
-    b.members.forEach(function(n){ if (absent.indexOf(n) >= 0) out.push({ name:n, part:b.part }); });
+    b.members.forEach(function(n){ if (absent.indexOf(n) >= 0) out.push({ name:n, part:b.part, group:b.group || "" }); });
   });
   return out;
 }
@@ -1889,7 +1941,7 @@ function cleanPeople(raw){
     if (!name || !key) return;
     if (seen[key]) key = key + "#" + out.length;
     seen[key] = 1;
-    out.push({ key:key, name:name, part: typeof p.part === "string" ? p.part : "" });
+    out.push({ key:key, name:name, part: typeof p.part === "string" ? p.part : "", group: typeof p.group === "string" ? p.group : "" });
   });
   return out.length ? out : null;
 }
@@ -1922,16 +1974,21 @@ function sanitizeChannel(raw, fallbackId){
   c.storeId = raw.storeId || null;
   c.limits = sanitizeLimits(raw.limits);
   var parts = expandParts(validParts(raw.parts));
-  c.parts = parts.length ? parts : ["검증1"];
+  c.parts = parts;
   c.absent = Array.isArray(raw.absent) ? raw.absent.filter(function(n){ return typeof n === "string"; }) : [];
-  /* 스냅샷에 있는 파트는 현재 명단에서 지워졌어도 채널 명단 유지를 위해 파트로 인정한다 */
+  /* 스냅샷에 있는 파트는 현재 명단에서 지워졌어도 채널 명단 유지를 위해 파트로 인정한다.
+     ‘개별 추가’는 파트가 아니라 추가 인원 묶음이라 파트 목록에 넣지 않는다 */
   if (raw.memberMap && typeof raw.memberMap === "object"){
-    Object.keys(raw.memberMap).forEach(function(k){ if (!isGroupPart(k) && c.parts.indexOf(k) < 0) c.parts.push(k); });
+    Object.keys(raw.memberMap).forEach(function(k){ if (!isGroupPart(k) && k !== "개별 추가" && c.parts.indexOf(k) < 0) c.parts.push(k); });
   }
   c.memberMap = cleanMemberMap(raw.memberMap);
   c.groupExtras = cleanMemberMap(raw.groupExtras);
   c.extraMembers = Array.isArray(raw.extraMembers) ? raw.extraMembers.filter(function(n){ return typeof n === "string" && n; }) : [];
   c.people = cleanPeople(raw.people);
+  /* 추가 인원만으로 연 채널은 파트가 비어 있는 게 정상이다 — 거기 기본 파트(검증1)를
+     끼워 넣으면 주문 단계에서 있지도 않은 파트 인원이 붙는다. 파트·인원 근거가
+     전혀 없을 때만 구버전 기본값을 채운다 */
+  if (!c.parts.length && !c.people && !c.extraMembers.length && !(c.memberMap && Object.keys(c.memberMap).length)) c.parts = ["검증1"];
   if (!c.memberMap) fillChannelSnapshot(c);
   c.orders = Array.isArray(raw.orders) ? raw.orders : [];
   c.skips = Array.isArray(raw.skips) ? raw.skips : [];
@@ -3964,7 +4021,7 @@ function renderChannelCreateForm(){
   var blocks = computeBlocks(d.parts, { memberMap:null, groupExtras:null, extras:[] });
   roster.innerHTML = blocks.length ? blocks.map(function(b){
     if (!b.members.length) return "";
-    return '<div class="partblock"><h3>' + esc(b.part) + ' <span class="gsum">' + b.members.length + '명</span></h3><div class="pgrid">' + b.members.map(function(n){ return '<span class="pchip">' + esc(n) + '</span>'; }).join("") + "</div></div>";
+    return '<div class="partblock"><h3>' + esc(blockTitle(b)) + ' <span class="gsum">' + b.members.length + '명</span></h3><div class="pgrid">' + b.members.map(function(n){ return '<span class="pchip">' + esc(n) + '</span>'; }).join("") + "</div></div>";
   }).join("") : '<div class="empty"><strong>파트를 골라 주세요</strong>인원이 여기에 나타납니다.</div>';
 }
 /* 채널 선택 콤보박스 — 칸에 입력한 글자가 들어간 채널만 걸러서 보여준다 */
@@ -4066,7 +4123,7 @@ function renderChannelList(){
   var blocks = rosterFor(c.parts, c.absent, chCtx(c));
   var membersHtml = blocks.length ? blocks.map(function(b){
     if (!b.members.length) return "";
-    return '<div class="partblock"><h3>' + esc(b.part) + ' <span class="gsum">' + b.members.length + '명</span></h3><div class="pgrid">' + b.members.map(function(n){ return '<span class="pchip">' + esc(n) + '</span>'; }).join("") + "</div></div>";
+    return '<div class="partblock"><h3>' + esc(blockTitle(b)) + ' <span class="gsum">' + b.members.length + '명</span></h3><div class="pgrid">' + b.members.map(function(n){ return '<span class="pchip">' + esc(n) + '</span>'; }).join("") + "</div></div>";
   }).join("") : '<div class="empty">인원이 없어요</div>';
   var storeOpts = '<option value="">가게를 고르세요</option>' + state.stores.map(function(s){ return '<option value="' + esc(s.id) + '"' + (c.storeId === s.id ? " selected" : "") + '>' + esc(s.name) + '</option>'; }).join("");
   if (storeSel){
@@ -4506,37 +4563,59 @@ function startNewOrder(){
   var mm = {}, parts = [], customs = [], people = [], ge = {};
   var selSet = {};
   ui.newSel.forEach(function(k){ selSet[k] = 1; });
-  function addPartEntry(part, e){
+  /* 사람마다 소속 그룹(group)을 함께 실는다 — 주문 단계에서도 그룹 › 파트 › 인원으로
+     구분해 보여 주기 위해서다. part는 지금까지처럼 파트 이름만 둔다 */
+  function addPartEntry(part, group, e){
     if (!selSet[e.key]) return;
-    people.push({ key: e.key, name: e.name, part: part });
+    people.push({ key: e.key, name: e.name, part: part, group: group || "" });
     if (!mm[part]){ mm[part] = []; parts.push(part); }
     mm[part].push(e.name);
+  }
+  /* 추가 인원은 먼저 그룹별로 모아 둔다 — 그룹 순서대로 그 그룹 파트들 뒤에 붙여야
+     주문 단계의 그룹 묶음이 중간에 끊기지 않는다 */
+  var customByGroup = {};
+  customSelList().forEach(function(k){
+    var sep = k.indexOf("\u0001");
+    var cg = sep >= 0 ? k.slice(0, sep) : "";
+    var n = sep >= 0 ? k.slice(sep + 1) : k;
+    if (!n) return;
+    if (!customByGroup[cg]) customByGroup[cg] = [];
+    customByGroup[cg].push({ key: k, name: n });
+  });
+  function addCustomEntries(cg){
+    (customByGroup[cg] || []).forEach(function(c){
+      customs.push(c.name);
+      people.push({ key: "X|" + encodeURIComponent(c.key), name: c.name, part: cg ? "추가 인원" : "개별 추가", group: cg });
+    });
   }
   var S_GROUPS2 = snapGroupList(), S_LEAVES2 = snapLeafList();
   S_GROUPS2.forEach(function(g){
     g.children.forEach(function(cn){
       var leaf = snapLeafFor(g.name, cn); if (!leaf) return;
-      leafEntriesFor(leaf, g.name).forEach(function(e){ addPartEntry(leaf.name, e); });
+      leafEntriesFor(leaf, g.name).forEach(function(e){ addPartEntry(leaf.name, g.name, e); });
     });
     groupExtraEntriesFor(g.name).forEach(function(e){
       if (!selSet[e.key]) return;
-      people.push({ key: e.key, name: e.name, part: g.name + " 전용" });
+      people.push({ key: e.key, name: e.name, part: "전용", group: g.name });
       if (!ge[g.name]) ge[g.name] = [];
       ge[g.name].push(e.name);
     });
+    addCustomEntries(g.name);
   });
   assignLeaves(S_LEAVES2, S_GROUPS2).loose.forEach(function(li){
     var leaf = S_LEAVES2[li];
-    leafEntriesFor(leaf, "").forEach(function(e){ addPartEntry(leaf.name, e); });
+    leafEntriesFor(leaf, "").forEach(function(e){ addPartEntry(leaf.name, "", e); });
   });
   /* 추가 인원 칩에서 고른 사람은 명단에 같은 이름이 있어도 파트 소속이 아니라
      추가 인원(extraMembers)으로 넣는다 — 칩 선택이 독립적인 것과 같은 기준이다.
-     그룹이 다르면 이름이 같아도 서로 다른 사람이므로 중복으로 지우지 않는다 */
-  customSelList().forEach(function(k){
-    var n = k.slice(k.indexOf("\u0001") + 1);
-    if (!n) return;
-    customs.push(n);
-    people.push({ key: "X|" + encodeURIComponent(k), name: n, part: "개별 추가" });
+     그룹이 다르면 이름이 같아도 서로 다른 사람이므로 중복으로 지우지 않는다.
+     추가한 그룹도 함께 실어, 주문 단계에서 어느 그룹의 추가 인원인지 구분한다.
+     명단에서 한 명도 고르지 않고 추가 인원만으로 여는 경우에도 이 목록(people)이
+     채널 인원 전부이므로, 파트(parts)가 비어 있어도 인원이 그대로 잡혀야 한다.
+     그룹에 속하지 않는 추가 인원(그룹이 없을 때만 생긴다)은 마지막에 붙인다 */
+  addCustomEntries("");
+  Object.keys(customByGroup).forEach(function(cg){
+    if (cg && !snapGroupDef(cg)) addCustomEntries(cg);
   });
   /* 이름만으로 추가한 사람만 있을 때도 명단이 유지되게 ‘개별 추가’ 스냅샷을 함께 남긴다 */
   if (!parts.length && customs.length) mm["개별 추가"] = customs.slice();
@@ -4567,12 +4646,15 @@ function renderRoster(){
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   if ((ui.myName || ui.myKey) && !flat.some(function(p){ return ui.myKey ? p.key===ui.myKey : p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; ui.myKey = ""; }
-  if (!activeChannel().parts.length || !flat.length){
+  /* 인원 판정은 파트 목록이 아니라 실제 명단(flat)으로만 한다 — 추가 인원만으로
+     연 채널은 파트가 비어 있어도 인원이 있는 게 정상이라, 파트가 비었다는 이유로
+     ‘시작되지 않았어요’로 비우면 추가 인원이 아예 안 잡힌 것처럼 보인다 */
+  if (!flat.length){
     area.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong>관리 화면에서 인원과 가게를 고르고 주문을 시작하면, 여기 이름 명단이 나타납니다.</div>';
     updateSkipNote();
     return;
   }
-  area.innerHTML = blocks.map(function(b){
+  function rosterBlockHtml(b, title){
     if (!b.members.length) return "";
     var done = b.members.filter(function(n, i){ return personStatusP({ name:n, key: b.keys ? b.keys[i] : "" })==="ordered"; }).length;
     var chips = b.members.map(function(n, i){
@@ -4580,9 +4662,24 @@ function renderRoster(){
       var st = personStatusP({ name:n, key:pkey });
       var badge = st==="ordered" ? '<span class="st">주문 완료</span>' : st==="skip" ? '<span class="st">Skip</span>' : "";
       var sel = pkey ? (ui.myKey===pkey) : (ui.myName===n);
-      return '<button type="button" class="pchip' + (sel ? " sel" : "") + '" data-person="' + esc(n) + '" data-part="' + esc(b.part) + '" data-pkey="' + esc(pkey) + '" data-state="' + st + '" aria-pressed="' + sel + '">' + esc(n) + badge + "</button>";
+      /* 본인 소속은 그룹까지 붙인 제목(예: Media1 · 검증1)으로 남긴다 —
+         주문·Skip의 파트별 구분이 그룹 단위까지 유지되게 하기 위해서다 */
+      return '<button type="button" class="pchip' + (sel ? " sel" : "") + '" data-person="' + esc(n) + '" data-part="' + esc(blockTitle(b)) + '" data-pkey="' + esc(pkey) + '" data-state="' + st + '" aria-pressed="' + sel + '">' + esc(n) + badge + "</button>";
     }).join("");
-    return '<div class="partblock"><h3>' + esc(b.part) + ' <span class="gsum">' + b.members.length + "명 중 " + done + '명 주문 완료</span></h3><div class="pgrid">' + chips + "</div></div>";
+    return '<div class="partblock"><h3>' + esc(title) + ' <span class="gsum">' + b.members.length + "명 중 " + done + '명 주문 완료</span></h3><div class="pgrid">' + chips + "</div></div>";
+  }
+  /* 그룹 › 파트 2단계로 묶어 그린다 — 그룹이 있는 블록은 그룹 제목 아래에
+     파트만 제목으로 들여 넣고, 그룹이 없는 블록은 지금까지처럼 통째로 보여 준다 */
+  area.innerHTML = groupSections(blocks).map(function(sec){
+    if (!sec.group) return rosterBlockHtml(sec.blocks[0], blockTitle(sec.blocks[0]));
+    var tot = 0, totDone = 0;
+    sec.blocks.forEach(function(b){
+      tot += b.members.length;
+      totDone += b.members.filter(function(n, i){ return personStatusP({ name:n, key: b.keys ? b.keys[i] : "" })==="ordered"; }).length;
+    });
+    var inner = sec.blocks.map(function(b){ return rosterBlockHtml(b, blockDisplay(b).sub); }).join("");
+    if (!inner) return "";
+    return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span><span class="gsum">' + tot + "명 중 " + totDone + '명 주문 완료</span></div><div class="roster-group-body">' + inner + "</div></div>";
   }).join("");
   Array.prototype.forEach.call(area.querySelectorAll("[data-person]"), function(btn){
     btn.addEventListener("click", function(){
@@ -5224,7 +5321,7 @@ function renderSetup(){
         + '<span class="toggle-track" aria-hidden="true"><span class="toggle-knob"></span></span>'
         + "</button></div>";
     }).join("");
-    return '<div class="partblock"><h3>' + esc(b.part) + ' <span class="gsum">' + b.members.length + "명" + (absentCount ? " · 자리 비움 " + absentCount + "명 제외" : " · 전원 참여") + '</span></h3><div class="absent-list">' + rowsHtml + "</div></div>";
+    return '<div class="partblock"><h3>' + esc(blockTitle(b)) + ' <span class="gsum">' + b.members.length + "명" + (absentCount ? " · 자리 비움 " + absentCount + "명 제외" : " · 전원 참여") + '</span></h3><div class="absent-list">' + rowsHtml + "</div></div>";
   }).join("");
   Array.prototype.forEach.call(area.querySelectorAll("[data-absent-toggle]"), function(b){
     b.addEventListener("click", function(){
@@ -6047,24 +6144,40 @@ function renderSummary(){
   var board = $("statusBoard");
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   var absentBlocks = absentInParts(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  if (!activeChannel().parts.length){
+  /* 인원 현황도 파트 목록이 아니라 실제 명단 블록으로 판단한다 — 추가 인원만으로
+     연 채널(파트 없음)도 현황이 보여야 한다 */
+  if (!blocks.length){
     board.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong>관리 화면에서 주문을 시작하면 인원 현황이 여기 나타납니다.</div>';
   } else {
-    var html = blocks.map(function(b){
+    function statusBlockHtml(b, title){
       var ordered = [], skipped = [], pending = [];
       b.members.forEach(function(n, i){
         var st = personStatusP({ name:n, key: b.keys ? b.keys[i] : "" });
         if (st==="ordered") ordered.push(n); else if (st==="skip") skipped.push(n); else pending.push(n);
       });
-      return '<div class="groupblock"><h3>' + esc(b.part) + ' <span class="gsum">주문 ' + ordered.length + " · Skip " + skipped.length + " · 미응답 " + pending.length + '</span></h3>'
+      return '<div class="groupblock"><h3>' + esc(title) + ' <span class="gsum">주문 ' + ordered.length + " · Skip " + skipped.length + " · 미응답 " + pending.length + '</span></h3>'
         + '<div class="statusline"><span class="sl">주문 완료</span><span class="sn">' + (ordered.length ? esc(ordered.join(", ")) : "없음") + "</span></div>"
         + '<div class="statusline"><span class="sl">Skip</span><span class="sn">' + (skipped.length ? esc(skipped.join(", ")) : "없음") + "</span></div>"
         + '<div class="statusline"><span class="sl">미응답</span><span class="sn">' + (pending.length ? esc(pending.join(", ")) : "없음") + "</span></div>"
         + "</div>";
+    }
+    /* 주문 명단과 같은 그룹 › 파트 2단계로 묶는다 */
+    var html = groupSections(blocks).map(function(sec){
+      if (!sec.group) return statusBlockHtml(sec.blocks[0], blockTitle(sec.blocks[0]));
+      var o2 = 0, s2 = 0, p2 = 0;
+      sec.blocks.forEach(function(b){
+        b.members.forEach(function(n, i){
+          var st = personStatusP({ name:n, key: b.keys ? b.keys[i] : "" });
+          if (st==="ordered") o2++; else if (st==="skip") s2++; else p2++;
+        });
+      });
+      var inner = sec.blocks.map(function(b){ return statusBlockHtml(b, blockDisplay(b).sub); }).join("");
+      if (!inner) return "";
+      return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span><span class="gsum">주문 ' + o2 + " · Skip " + s2 + " · 미응답 " + p2 + '</span></div><div class="roster-group-body">' + inner + "</div></div>";
     }).join("");
     if (absentBlocks.length){
       var byPart = {};
-      absentBlocks.forEach(function(a){ (byPart[a.part] = byPart[a.part] || []).push(a.name); });
+      absentBlocks.forEach(function(a){ var t = blockTitle(a); (byPart[t] = byPart[t] || []).push(a.name); });
       html += '<div class="groupblock"><h3>자리 비움 — 이번 주문에서 제외 <span class="gsum">' + absentBlocks.length + '명</span></h3>'
         + Object.keys(byPart).map(function(pn){
             return '<div class="statusline"><span class="sl">' + esc(pn) + '</span><span class="sn">' + esc(byPart[pn].join(", ")) + "</span></div>";
