@@ -380,6 +380,38 @@
       }
       @media (min-width:1024px){ .mobile-cart-bar{display:none !important} }
       .order-restore-row{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+      /* 주문 화면 A안 — 상단 작은 줄(나 + 숫자 요약 + 현황 보기). 긴 이름 칩 그리드를 대신한다 */
+      .mebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+      .mebar-me{display:flex;align-items:center;gap:8px;flex:none;min-height:42px}
+      .mebar-name{font-size:15.5px}
+      .mebar-sum{flex:1 1 auto;text-align:center;color:var(--muted);font-weight:700;font-size:14px}
+      @media (max-width:560px){ .mebar-sum{order:3;flex:1 1 100%;text-align:left} }
+      /* 이름 선택 팝업 — 모바일에서도 바텀시트가 아니라 가운데 모달로 뜬다 */
+      #personModal{align-items:center;padding:16px}
+      #personModal .modal-sheet{border-radius:28px;box-shadow:0 18px 50px rgba(15,118,110,.22)}
+      #personList{margin-top:12px}
+      .prows{display:flex;flex-direction:column;gap:6px}
+      .prow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);
+        border-radius:14px;padding:9px 12px;min-height:46px;cursor:pointer;color:var(--ink)}
+      .prow:hover{border-color:var(--line-strong)}
+      .prow:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+      .prow.sel{background:var(--mint);border-color:var(--green)}
+      .prow .pname{font-weight:800;font-size:15px;flex:none}
+      .prow .pstat-wrap{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-width:0}
+      .pstat{font-size:13.5px;font-weight:700;text-align:right}
+      .pstat.ordered{color:var(--green-text)}
+      .pstat.skip{color:var(--muted)}
+      .pstat.pending{color:var(--warn-text)}
+      .pcancel{flex:none;border:1px solid var(--danger-line);background:var(--danger-soft);color:var(--danger);
+        border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800;min-height:30px;cursor:pointer}
+      /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
+      .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
+      .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+      .catchip{min-height:34px;padding:4px 13px;font-size:13.5px}
+      /* 제출된 주문 [내 메뉴 / 멤버 메뉴] 탭 */
+      .ordertabs{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:16px}
+      .otab{flex:1 1 0;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:7px;font-weight:800;font-size:14px;min-height:38px;cursor:pointer}
+      .otab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
       /* 메뉴 추가·편집 팝업 (모달) — 목록에서 바로 떠서 고친다 */
       .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
       .modal-backdrop{position:absolute;inset:0;background:rgba(13,27,22,.5)}
@@ -639,12 +671,17 @@
         <div class="order-layout">
           <div class="order-main">
             <div class="card">
-              <div class="section-head">
-                <div><h2>이름 선택</h2></div>
+              <div class="mebar" id="meBar">
+                <div class="mebar-me">
+                  <span class="mebar-name" id="meBarName"></span>
+                  <button class="btn primary" id="mePickBtn" type="button">나를 선택해 주세요</button>
+                  <button class="btn small hidden" id="meChangeBtn" type="button">변경</button>
+                </div>
+                <div class="mebar-sum" id="meBarSummary" role="status"></div>
+                <button class="btn small" id="statusViewBtn" type="button">현황 보기</button>
               </div>
-              <div id="rosterArea"></div>
               <div class="btnrow mt">
-                <button class="btn green" id="skipBtn" type="button">Skip · 주문 안 함</button>
+                <button class="btn green" id="skipBtn" type="button">Skip</button>
               </div>
               <div id="mySkipNote" class="mt hidden"></div>
             </div>
@@ -653,9 +690,12 @@
               <div class="section-head">
                 <div><h2 id="menuHead">메뉴 고르기</h2><p class="sub hidden" id="menuHeadSub"></p></div>
               </div>
-              <div id="menuSearchWrap" style="margin-bottom:10px">
-                <label class="flabel" for="menuSearch">메뉴 검색</label>
-                <input class="field" id="menuSearch" type="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
+              <div class="menu-tools">
+                <div id="menuSearchWrap">
+                  <label class="flabel" for="menuSearch">메뉴 검색</label>
+                  <input class="field" id="menuSearch" type="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
+                </div>
+                <div class="catchips" id="orderCatChips" role="group" aria-label="메뉴 카테고리"></div>
               </div>
               <div id="menuArea"></div>
             </div>
@@ -685,19 +725,17 @@
               </div>
               <div class="stats">
                 <div class="stat"><div class="k">총액</div><div class="v" id="statTotal">0원</div></div>
-                <div class="stat"><div class="k">주문 완료</div><div class="v" id="statPeople">0<small> 명</small></div></div>
                 <div class="stat"><div class="k">전체 수량</div><div class="v" id="statQty">0<small> 개</small></div></div>
-                <div class="stat stat-skip"><div class="k">Skip · 주문 안 함</div><div class="v" id="statSkip">0<small> 명</small></div></div>
+                <div class="stat"><div class="k">주문 완료</div><div class="v" id="statPeople">0<small> 명</small></div></div>
+                <div class="stat stat-skip"><div class="k">Skip</div><div class="v" id="statSkip">0<small> 명</small></div></div>
                 <div class="stat stat-pending"><div class="k">아직 안 함</div><div class="v" id="statPending">0<small> 명</small></div></div>
               </div>
-              <div id="statusBoard"></div>
               <h3 class="card-subhead">메뉴별 합계</h3>
               <div id="byMenu"></div>
-              <h3 class="card-subhead">주문 내역</h3>
+              <div class="ordertabs" id="ordersTabs" role="tablist" aria-label="주문 내역 구분"></div>
               <div id="ordersList"></div>
               <div class="btnrow mt">
-                <button class="btn primary" id="copyStoreBtn" type="button">가게 전달용 복사</button>
-                <button class="btn" id="copyAllBtn" type="button">전체 취합 복사 (파트별)</button>
+                <button class="btn primary" id="copyAllBtn" type="button">취합 내용 복사</button>
                 <button class="btn danger" id="clearOrdersBtn" type="button">주문 전체 비우기</button>
               </div>
               <div id="clearConfirm" class="hidden"></div>
@@ -753,6 +791,22 @@
         </div>
       </section>
 
+    </div>
+
+    <!-- 이름 선택 팝업 (A안): 가운데 모달 — 이름을 고르는 곳이자 전체 현황을 보는 곳.
+         줄마다 이름 + 상태(주문한 메뉴는 초록, Skip은 회색, 아직 안 함은 주황)가 보이고,
+         내가 선택한 줄에만 주문 취소 버튼이 붙는다 -->
+    <div class="modal hidden" id="personModal" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
+      <div class="modal-backdrop" id="personModalBackdrop"></div>
+      <div class="modal-sheet">
+        <div class="modal-head">
+          <h3 id="personModalTitle">내 이름 선택</h3>
+          <button class="modal-close" id="personModalCloseBtn" type="button" aria-label="팝업 닫기">×</button>
+        </div>
+        <label class="flabel" for="personSearch">이름 검색</label>
+        <input class="field" id="personSearch" type="search" placeholder="이름으로 검색" autocomplete="off" />
+        <div id="personList"></div>
+      </div>
     </div>
 
     <!-- 메뉴 추가·편집 팝업: 목록에서 ‘편집’을 누르면 그 자리에서 바로 뜬다 -->
@@ -1826,7 +1880,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", personQuery:"", ordersTab:"mine", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -1872,6 +1926,7 @@ function _closeModalById(id, fromPop){
   else if (id === "gongchaModal") closeGongchaModal(fromPop);
   else if (id === "sizeModal") closeSizeModal(fromPop);
   else if (id === "storePickModal") applyStorePick(fromPop);
+  else if (id === "personModal") closePersonModal(fromPop);
   else { var el = $(id); if (el) el.classList.add("hidden"); _trackModalClose(id, fromPop); }
 }
 window.addEventListener("popstate", function(){
@@ -4620,56 +4675,104 @@ function startNewOrder(){
   enterOrderScreen(target.id);
   toast("주문을 시작했어요. ‘주문 링크 복사’로 카톡에 공유하세요.");
 }
+/* 주문 화면 상단 작은 줄(A안) — 긴 이름 칩 그리드 대신 ‘나 + 숫자 요약 + 현황 보기’ 한 줄만 둔다.
+   이름을 고르는 일과 전체 현황 보기는 이름 선택 팝업(#personModal)이 맡는다 */
 function renderRoster(){
-  var area = $("rosterArea");
-  var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
+  var nameEl = $("meBarName"); if (!nameEl) return;
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   if ((ui.myName || ui.myKey) && !flat.some(function(p){ return ui.myKey ? p.key===ui.myKey : p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; ui.myKey = ""; }
-  /* 인원 판정은 파트 목록이 아니라 실제 명단(flat)으로만 한다 — 추가 인원만으로
-     연 채널은 파트가 비어 있어도 인원이 있는 게 정상이라, 파트가 비었다는 이유로
-     ‘시작되지 않았어요’로 비우면 추가 인원이 아예 안 잡힌 것처럼 보인다 */
+  var pickBtn = $("mePickBtn"), changeBtn = $("meChangeBtn"), sumEl = $("meBarSummary");
   if (!flat.length){
-    area.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong></div>';
-    updateSkipNote();
+    nameEl.textContent = "아직 주문이 시작되지 않았어요";
+    if (sumEl) sumEl.textContent = "";
+    pickBtn.classList.add("hidden"); changeBtn.classList.add("hidden");
+    updateSkipNote(); renderPersonList();
     return;
   }
-  function rosterBlockHtml(b, title){
-    if (!b.members.length) return "";
-    var done = b.members.filter(function(n, i){ return personStatusP({ name:n, key: b.keys ? b.keys[i] : "" })==="ordered"; }).length;
-    var chips = b.members.map(function(n, i){
-      var pkey = b.keys ? b.keys[i] : "";
-      var st = personStatusP({ name:n, key:pkey });
-      var badge = st==="ordered" ? '<span class="st">주문 완료</span>' : st==="skip" ? '<span class="st">Skip</span>' : "";
-      var sel = pkey ? (ui.myKey===pkey) : (ui.myName===n);
-      /* 본인 소속은 그룹까지 붙인 제목(예: Media1 · 검증1)으로 남긴다 —
-         주문·Skip의 파트별 구분이 그룹 단위까지 유지되게 하기 위해서다 */
-      return '<button type="button" class="pchip' + (sel ? " sel" : "") + '" data-person="' + esc(n) + '" data-part="' + esc(blockTitle(b)) + '" data-pkey="' + esc(pkey) + '" data-state="' + st + '" aria-pressed="' + sel + '">' + esc(n) + badge + "</button>";
-    }).join("");
-    return '<div class="partblock"><h3>' + esc(title) + '</h3><div class="pgrid">' + chips + "</div></div>";
+  var t = totals();
+  if (sumEl) sumEl.textContent = "주문 완료 " + t.people + " · Skip " + t.skips + " · 아직 안 함 " + t.pending;
+  if (ui.myName){
+    nameEl.innerHTML = "나: <b>" + esc(ui.myName) + "</b>";
+    pickBtn.classList.add("hidden"); changeBtn.classList.remove("hidden");
+  } else {
+    nameEl.textContent = "";
+    pickBtn.classList.remove("hidden"); changeBtn.classList.add("hidden");
   }
-  /* 그룹 › 파트 2단계로 묶어 그린다 — 그룹이 있는 블록은 그룹 제목 아래에
-     파트만 제목으로 들여 넣고, 그룹이 없는 블록은 지금까지처럼 통째로 보여 준다 */
-  area.innerHTML = groupSections(blocks).map(function(sec){
-    if (!sec.group) return rosterBlockHtml(sec.blocks[0], blockTitle(sec.blocks[0]));
-    var tot = 0, totDone = 0;
-    sec.blocks.forEach(function(b){
-      tot += b.members.length;
-      totDone += b.members.filter(function(n, i){ return personStatusP({ name:n, key: b.keys ? b.keys[i] : "" })==="ordered"; }).length;
-    });
-    var inner = sec.blocks.map(function(b){ return rosterBlockHtml(b, blockDisplay(b).sub); }).join("");
+  updateSkipNote();
+  renderPersonList();
+}
+/* 이름 선택 팝업 — 그룹 › 파트로 묶인 명단을 한 줄씩 그린다.
+   주문했으면 주문한 메뉴를 초록으로, Skip이면 회색 Skip, 아직 안 했으면 주황 ‘아직 안 함’.
+   내가 선택한 줄(민트색)에만 메뉴 옆에 ‘취소’ 버튼이 붙는다 */
+function personOrderSummary(o){
+  return o.items.map(function(it){ var s = itemSuffix(it); return it.name + (s ? "(" + s + ")" : "") + " ×" + it.qty; }).join(", ");
+}
+function renderPersonList(){
+  var list = $("personList"); if (!list) return;
+  var modal = $("personModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
+  var q = (ui.personQuery || "").trim().toLowerCase();
+  function rowHtml(n, pkey, fullTitle){
+    var st = personStatusP({ name:n, key:pkey });
+    var sel = pkey ? (ui.myKey === pkey) : (ui.myName === n && !ui.myKey);
+    var statusHtml;
+    if (st === "ordered"){
+      var o = pkey ? orderOfKey(pkey) : orderOf(n);
+      statusHtml = '<span class="pstat ordered">' + esc(o ? personOrderSummary(o) : "주문 완료") + "</span>"
+        + (sel && o ? '<button type="button" class="pcancel" data-pcancel="' + esc(o.id) + '">취소</button>' : "");
+    } else if (st === "skip"){
+      statusHtml = '<span class="pstat skip">Skip</span>';
+    } else {
+      statusHtml = '<span class="pstat pending">아직 안 함</span>';
+    }
+    return '<div class="prow' + (sel ? " sel" : "") + '" role="button" tabindex="0" data-prow="' + esc(n) + '" data-ppart="' + esc(fullTitle) + '" data-pkey="' + esc(pkey) + '"><span class="pname">' + esc(n) + '</span><span class="pstat-wrap">' + statusHtml + "</span></div>";
+  }
+  function blockHtml(b, heading, fullTitleOf){
+    var rows = b.members.map(function(n, i){
+      if (q && n.toLowerCase().indexOf(q) < 0) return "";
+      return rowHtml(n, b.keys ? b.keys[i] : "", fullTitleOf);
+    }).join("");
+    if (!rows) return "";
+    return '<div class="partblock"><h3>' + esc(heading) + '</h3><div class="prows">' + rows + "</div></div>";
+  }
+  var html = groupSections(blocks).map(function(sec){
+    if (!sec.group) return blockHtml(sec.blocks[0], blockTitle(sec.blocks[0]), blockTitle(sec.blocks[0]));
+    var inner = sec.blocks.map(function(b){ return blockHtml(b, blockDisplay(b).sub, blockTitle(b)); }).join("");
     if (!inner) return "";
     return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span></div><div class="roster-group-body">' + inner + "</div></div>";
   }).join("");
-  Array.prototype.forEach.call(area.querySelectorAll("[data-person]"), function(btn){
-    btn.addEventListener("click", function(){
-      ui.myName = btn.getAttribute("data-person");
-      ui.myPart = btn.getAttribute("data-part");
-      ui.myKey = btn.getAttribute("data-pkey") || "";
-      renderRoster(); renderOrdersList();
+  list.innerHTML = html || '<div class="empty"><strong>검색 결과가 없어요</strong></div>';
+  Array.prototype.forEach.call(list.querySelectorAll("[data-pcancel]"), function(b){
+    b.addEventListener("click", function(e){
+      e.stopPropagation();
+      restoreOrderToCart(b.getAttribute("data-pcancel"));
     });
   });
-  updateSkipNote();
+  Array.prototype.forEach.call(list.querySelectorAll("[data-prow]"), function(row){
+    function pick(){
+      ui.myName = row.getAttribute("data-prow");
+      ui.myPart = row.getAttribute("data-ppart");
+      ui.myKey = row.getAttribute("data-pkey") || "";
+      closePersonModal();
+      renderRoster(); renderOrdersList();
+    }
+    row.addEventListener("click", pick);
+    row.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); } });
+  });
 }
+function openPersonModal(){
+  var m = $("personModal"); if (!m) return;
+  ui.personQuery = "";
+  var s = $("personSearch"); if (s) s.value = "";
+  m.classList.remove("hidden"); _trackModalOpen("personModal");
+  renderPersonList();
+}
+function closePersonModal(fromPop){
+  var m = $("personModal"); if (!m || m.classList.contains("hidden")) return;
+  m.classList.add("hidden"); _trackModalClose("personModal", fromPop);
+}
+
 /* 장바구니 키: ICE·HOT 둘 다인 메뉴는 온도별로 항목을 나눈다 (가격이 다를 수 있어서) */
 function cartKeyFor(menu){
   var t = tempLabel(menu, ui.tempSel[menu.id]);
@@ -4700,8 +4803,10 @@ function renderMenuArea(){
     $("menuHeadSub").classList.add("hidden");
   }
   var searchWrap = $("menuSearchWrap");
+  var chipsEarly = $("orderCatChips");
   if (!rs){
     if (searchWrap) searchWrap.classList.add("hidden");
+    if (chipsEarly) chipsEarly.innerHTML = "";
     $("menuHeadSub").textContent = "";
     $("menuHeadSub").classList.add("hidden");
     area.innerHTML = '<div class="empty"><strong>가게가 정해지지 않았어요</strong></div>';
@@ -4709,16 +4814,30 @@ function renderMenuArea(){
   }
   if (!rs.menus || !rs.menus.length){
     if (searchWrap) searchWrap.classList.add("hidden");
+    if (chipsEarly) chipsEarly.innerHTML = "";
     area.innerHTML = '<div class="empty"><strong>이 가게에 메뉴가 아직 없어요</strong></div>';
     return;
   }
   if (searchWrap) searchWrap.classList.remove("hidden");
+  /* 카테고리 칩 — 가게에 실제로 메뉴가 있는 카테고리만 ‘전체’ 뒤에 붙인다.
+     고른 카테고리(ui.menuCat)가 사라졌으면 전체로 되돌린다 */
+  var chipEl = $("orderCatChips");
+  var catsPresent = storeCategories(rs).filter(function(c){ return rs.menus.some(function(m){ return menuCat(m) === c; }); });
+  if (ui.menuCat && catsPresent.indexOf(ui.menuCat) < 0) ui.menuCat = "";
+  if (chipEl){
+    chipEl.innerHTML = '<button type="button" class="chip catchip" data-mcat="" aria-pressed="' + (!ui.menuCat) + '">전체</button>'
+      + catsPresent.map(function(c){ return '<button type="button" class="chip catchip" data-mcat="' + esc(c) + '" aria-pressed="' + (ui.menuCat === c) + '">' + esc(c) + "</button>"; }).join("");
+    Array.prototype.forEach.call(chipEl.querySelectorAll("[data-mcat]"), function(b){
+      b.addEventListener("click", function(){ ui.menuCat = b.getAttribute("data-mcat") || ""; renderMenuArea(); });
+    });
+  }
   /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음).
      검색 중에는 맞는 메뉴가 없는 카테고리는 통째로 숨겨진다 */
   var query = (ui.menuQuery || "").trim().toLowerCase();
   var menus = rs.menus;
+  if (ui.menuCat) menus = menus.filter(function(m){ return menuCat(m) === ui.menuCat; });
   if (query){
-    menus = rs.menus.filter(function(m){ return String(m.name || "").toLowerCase().indexOf(query) >= 0; });
+    menus = menus.filter(function(m){ return String(m.name || "").toLowerCase().indexOf(query) >= 0; });
     if (!menus.length){
       area.innerHTML = '<div class="empty"><strong>‘' + esc((ui.menuQuery || "").trim()) + '’ 검색 결과가 없어요</strong></div>';
       return;
@@ -4961,22 +5080,46 @@ function restoreOrderToCart(orderId){
   var cc = $("cartCard");
   if (cc) cc.scrollIntoView({ behavior: "smooth", block: "center" });
 }
+/* 제출된 주문 내역 — [내 메뉴]에는 내 제출분만(취소·되돌리기 버튼 포함),
+   [멤버 메뉴]에는 다른 사람별로 이름과 주문한 메뉴를 보여 준다 */
 function renderOrdersList(){
-  var el = $("ordersList");
-  if (!activeChannel().orders.length){
-    el.innerHTML = '<div class="empty"><strong>아직 제출된 주문이 없어요</strong></div>';
-    return;
+  var el = $("ordersList"), tabsEl = $("ordersTabs");
+  function isMine(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
+  var mineOrder = null;
+  activeChannel().orders.forEach(function(o){ if (!mineOrder && isMine(o)) mineOrder = o; });
+  if (tabsEl){
+    tabsEl.innerHTML = '<button type="button" class="otab" role="tab" data-otab="mine" aria-selected="' + (ui.ordersTab !== "members") + '">내 메뉴</button>'
+      + '<button type="button" class="otab" role="tab" data-otab="members" aria-selected="' + (ui.ordersTab === "members") + '">멤버 메뉴</button>';
+    Array.prototype.forEach.call(tabsEl.querySelectorAll("[data-otab]"), function(b){
+      b.addEventListener("click", function(){ ui.ordersTab = b.getAttribute("data-otab"); renderOrdersList(); });
+    });
   }
-  var rows = activeChannel().orders.slice().reverse().map(function(o){
+  function rowHtml(o, mine){
     var detail = o.items.map(function(it){ var s = itemSuffix(it); return esc(it.name) + (s ? "(" + esc(s) + ")" : "") + " ×" + it.qty; }).join(", ");
-    var mine = o.pkey ? (ui.myKey && o.pkey === ui.myKey) : (ui.myName && o.name === ui.myName);
     return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span> <span class="tempbadge">' + esc(o.group) + "</span>"
       + '<div class="detail">' + detail + '</div></div>'
       + '<span class="amount">' + won(orderTotal(o)) + "</span>"
       + (mine ? '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button><button type="button" class="btn small danger" data-delorder="' + esc(o.id) + '">내 주문 취소</button></div>' : "")
       + "</div>";
-  }).join("");
-  el.innerHTML = rows;
+  }
+  if (ui.ordersTab === "members"){
+    var others = activeChannel().orders.filter(function(o){ return !isMine(o); });
+    if (!others.length){
+      el.innerHTML = '<div class="empty"><strong>다른 사람의 주문이 아직 없어요</strong></div>';
+      return;
+    }
+    el.innerHTML = others.slice().reverse().map(function(o){ return rowHtml(o, false); }).join("");
+    return;
+  }
+  if (!ui.myName){
+    el.innerHTML = '<div class="empty"><strong>이름을 선택하면 내 주문이 보여요</strong></div>';
+    return;
+  }
+  if (!mineOrder){
+    el.innerHTML = '<div class="empty"><strong>아직 제출한 주문이 없어요</strong></div>';
+    return;
+  }
+  el.innerHTML = rowHtml(mineOrder, true);
   Array.prototype.forEach.call(el.querySelectorAll("[data-delorder]"), function(b){
     b.addEventListener("click", function(){
       dropOrderById(activeChannel(), b.getAttribute("data-delorder"));
@@ -4989,6 +5132,7 @@ function renderOrdersList(){
     });
   });
 }
+
 function updateSkipNote(){
   var note = $("mySkipNote");
   var mine = ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null);
@@ -6120,69 +6264,13 @@ function renderSummary(){
   $("statQty").innerHTML = t.qty + "<small> 개</small>";
   $("statSkip").innerHTML = t.skips + "<small> 명</small>";
   $("statPending").innerHTML = t.pending + "<small> 명</small>";
-  /* 인원 현황 */
-  var board = $("statusBoard");
-  var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  var absentBlocks = absentInParts(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  /* 인원 현황도 파트 목록이 아니라 실제 명단 블록으로 판단한다 — 추가 인원만으로
-     연 채널(파트 없음)도 현황이 보여야 한다 */
-  if (!blocks.length){
-    board.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong></div>';
-  } else {
-    function statusBlockHtml(b, title){
-      var ordered = [], skipped = [], pending = [];
-      b.members.forEach(function(n, i){
-        var st = personStatusP({ name:n, key: b.keys ? b.keys[i] : "" });
-        if (st==="ordered") ordered.push(n); else if (st==="skip") skipped.push(n); else pending.push(n);
-      });
-      return '<div class="groupblock"><h3>' + esc(title) + ' <span class="gsum">주문 완료 ' + ordered.length + " · Skip " + skipped.length + " · 아직 안 함 " + pending.length + '</span></h3>'
-        + '<div class="statusline is-ordered"><span class="sl">주문 완료</span><span class="sn">' + (ordered.length ? esc(ordered.join(", ")) : "없음") + "</span></div>"
-        + '<div class="statusline is-skip"><span class="sl">Skip · 주문 안 함</span><span class="sn">' + (skipped.length ? esc(skipped.join(", ")) : "없음") + "</span></div>"
-        + '<div class="statusline is-pending"><span class="sl">아직 안 함</span><span class="sn">' + (pending.length ? esc(pending.join(", ")) : "없음") + "</span></div>"
-        + "</div>";
-    }
-    /* 주문 명단과 같은 그룹 › 파트 2단계로 묶는다 */
-    var html = groupSections(blocks).map(function(sec){
-      if (!sec.group) return statusBlockHtml(sec.blocks[0], blockTitle(sec.blocks[0]));
-      var o2 = 0, s2 = 0, p2 = 0;
-      sec.blocks.forEach(function(b){
-        b.members.forEach(function(n, i){
-          var st = personStatusP({ name:n, key: b.keys ? b.keys[i] : "" });
-          if (st==="ordered") o2++; else if (st==="skip") s2++; else p2++;
-        });
-      });
-      var inner = sec.blocks.map(function(b){ return statusBlockHtml(b, blockDisplay(b).sub); }).join("");
-      if (!inner) return "";
-      return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span><span class="gsum">주문 완료 ' + o2 + " · Skip " + s2 + " · 아직 안 함 " + p2 + '</span></div><div class="roster-group-body">' + inner + "</div></div>";
-    }).join("");
-    if (absentBlocks.length){
-      var byPart = {};
-      absentBlocks.forEach(function(a){ var t = blockTitle(a); (byPart[t] = byPart[t] || []).push(a.name); });
-      html += '<div class="groupblock"><h3>자리 비움 — 이번 주문에서 제외 <span class="gsum">' + absentBlocks.length + '명</span></h3>'
-        + Object.keys(byPart).map(function(pn){
-            return '<div class="statusline"><span class="sl">' + esc(pn) + '</span><span class="sn">' + esc(byPart[pn].join(", ")) + "</span></div>";
-          }).join("") + "</div>";
-    }
-    /* 채널 밖에서 들어온 주문/Skip (명단에 없는 이름) */
-    var inRoster = {}, inRosterKey = {};
-    rosterFlat(activeChannel().parts, [], chCtx(activeChannel())).forEach(function(p){ inRoster[p.name] = 1; if (p.key) inRosterKey[p.key] = 1; });
-    var extraOrders = activeChannel().orders.filter(function(o){ return o.pkey ? !inRosterKey[o.pkey] : !inRoster[o.name]; });
-    var extraSkips = activeChannel().skips.filter(function(s){ return (s.pkey ? !inRosterKey[s.pkey] : !inRoster[s.name]) || activeChannel().absent.indexOf(s.name) >= 0; });
-    if (extraOrders.length || extraSkips.length){
-      html += '<div class="groupblock"><h3>명단 밖 응답</h3>'
-        + (extraOrders.length ? '<div class="statusline is-ordered"><span class="sl">주문 완료</span><span class="sn">' + esc(extraOrders.map(function(o){ return o.name; }).join(", ")) + "</span></div>" : "")
-        + (extraSkips.length ? '<div class="statusline is-skip"><span class="sl">Skip · 주문 안 함</span><span class="sn">' + esc(extraSkips.map(function(s){ return s.name; }).join(", ")) + "</span></div>" : "")
-        + "</div>";
-    }
-    board.innerHTML = html;
-  }
   /* 메뉴별 합계 */
   var agg = aggByMenu(), bm = $("byMenu");
   if (!agg.length) bm.innerHTML = '<div class="empty"><strong>아직 취합할 주문이 없어요</strong></div>';
   else bm.innerHTML = agg.map(function(a){
     return '<div class="menuagg"><span class="an">' + esc(a.name) + (a.suffix ? " (" + esc(a.suffix) + ")" : "") + '</span>'
       + '<span class="aq">× ' + a.qty + '</span><span class="amount">' + won(a.amount) + "</span>"
-      + '<span class="awho">' + esc(a.who.join(" · ")) + "</span></div>";
+      + "</div>";
   }).join("");
   updateSkipNote();
 }
@@ -6520,9 +6608,17 @@ $("channelCancelBtn").addEventListener("click", function(){ closeChannelModal(tr
 $("channelModalCloseBtn").addEventListener("click", function(){ closeChannelModal(true); });
 $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModal(true); });
 
+/* 이름 선택 팝업 (A안) — ‘나를 선택해 주세요’·‘변경’·‘현황 보기’가 모두 같은 팝업을 연다 */
+$("mePickBtn").addEventListener("click", function(){ openPersonModal(); });
+$("meChangeBtn").addEventListener("click", function(){ openPersonModal(); });
+$("statusViewBtn").addEventListener("click", function(){ openPersonModal(); });
+$("personModalCloseBtn").addEventListener("click", function(){ closePersonModal(); });
+$("personModalBackdrop").addEventListener("click", function(){ closePersonModal(); });
+$("personSearch").addEventListener("input", function(){ ui.personQuery = this.value; renderPersonList(); });
+
 /* 본인 Skip (주문 화면에서 각자) */
 $("skipBtn").addEventListener("click", function(){
-  if (!ui.myName){ toast("먼저 위 명단에서 내 이름을 눌러 주세요."); return; }
+  if (!ui.myName){ toast("먼저 이름을 선택해 주세요."); return; }
   if (ui.myKey ? skipOfKey(ui.myKey) : skipOf(ui.myName)){ toast("이미 Skip으로 표시돼 있어요."); updateSkipNote(); return; }
   dropOrdersByPerson(activeChannel(), ui.myName, ui.myKey);
   var skipEntry = { id: uid("skip"), name: ui.myName, group: ui.myPart, ts: Date.now() };
@@ -6542,7 +6638,7 @@ if (_submitBlocker){
 $("submitBtn").addEventListener("click", function(){
   if (!syncConnected){ toast(syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…"); return; }
   if (!roundStore()){ toast("가게가 선택되지 않은 채널이에요. 먼저 가게를 선택해 주세요."); return; }
-  if (!ui.myName){ toast("먼저 위 명단에서 내 이름을 눌러 주세요."); return; }
+  if (!ui.myName){ toast("먼저 이름을 선택해 주세요."); return; }
   var items = cartItems();
   if (!items.length){ toast("메뉴를 먼저 담아 주세요."); return; }
   var viol = cartViolation();
@@ -6859,7 +6955,9 @@ document.addEventListener("keydown", function(e){
   var stm = $("storesModal");
   if (stm && !stm.classList.contains("hidden")){ closeStoresModal(); return; }
   var ptm = $("partsModal");
-  if (ptm && !ptm.classList.contains("hidden")){ closePartsModal(); }
+  if (ptm && !ptm.classList.contains("hidden")){ closePartsModal(); return; }
+  var pm2 = $("personModal");
+  if (pm2 && !pm2.classList.contains("hidden")){ closePersonModal(); }
 });
 $("openNewMenuBtn").addEventListener("click", function(){
   if (!state.stores.length){ toast("먼저 가게를 추가하세요."); return; }
@@ -6918,10 +7016,6 @@ $("menuSaveBtn").addEventListener("click", function(){
 });
 
 /* summary actions */
-$("copyStoreBtn").addEventListener("click", function(){
-  if (!activeChannel().orders.length){ toast("아직 주문이 없어요."); return; }
-  copyText(storeCopyText(), "가게 전달용으로 복사했어요. 카톡에 붙여넣으세요.");
-});
 $("copyAllBtn").addEventListener("click", function(){
   if (!activeChannel().orders.length && !activeChannel().skips.length){ toast("아직 취합할 내용이 없어요."); return; }
   copyText(allCopyText(), "전체 취합을 복사했어요. 카톡에 붙여넣으세요.");
