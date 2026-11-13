@@ -417,12 +417,12 @@
       /* 팝업 스크롤바 A안 — 모든 팝업(.modal-sheet: 채널·가게·메뉴·공차 옵션·인원·이름 변경 / .bsheet-list: 가게 선택) 공통.
          얇은(6px) 둥근 손잡이 + 투명 트랙으로 내용 위에 떠 보이고, 평소에는 숨겨 두었다가
          스크롤 중(.scrolling — 아래 스크립트가 붙였다 뗀다)에만 나타났다 사라진다 */
-      .modal-sheet,.bsheet-list,.combo-list,.store-dd-list{scrollbar-width:thin;scrollbar-color:transparent transparent}
-      .modal-sheet.scrolling,.bsheet-list.scrolling,.combo-list.scrolling,.store-dd-list.scrolling{scrollbar-color:var(--scroll-thumb) transparent}
-      .modal-sheet::-webkit-scrollbar,.bsheet-list::-webkit-scrollbar,.combo-list::-webkit-scrollbar,.store-dd-list::-webkit-scrollbar{width:6px;height:6px}
-      .modal-sheet::-webkit-scrollbar-track,.bsheet-list::-webkit-scrollbar-track,.combo-list::-webkit-scrollbar-track,.store-dd-list::-webkit-scrollbar-track{background:transparent}
-      .modal-sheet::-webkit-scrollbar-thumb,.bsheet-list::-webkit-scrollbar-thumb,.combo-list::-webkit-scrollbar-thumb,.store-dd-list::-webkit-scrollbar-thumb{background:transparent;border-radius:99px;transition:background .35s ease}
-      .modal-sheet.scrolling::-webkit-scrollbar-thumb,.bsheet-list.scrolling::-webkit-scrollbar-thumb,.combo-list.scrolling::-webkit-scrollbar-thumb,.store-dd-list.scrolling::-webkit-scrollbar-thumb{background:var(--scroll-thumb)}
+      .modal-sheet,.bsheet-list,.combo-list,.store-dd-scroll{scrollbar-width:thin;scrollbar-color:transparent transparent}
+      .modal-sheet.scrolling,.bsheet-list.scrolling,.combo-list.scrolling,.store-dd-scroll.scrolling{scrollbar-color:var(--scroll-thumb) transparent}
+      .modal-sheet::-webkit-scrollbar,.bsheet-list::-webkit-scrollbar,.combo-list::-webkit-scrollbar,.store-dd-scroll::-webkit-scrollbar{width:6px;height:6px}
+      .modal-sheet::-webkit-scrollbar-track,.bsheet-list::-webkit-scrollbar-track,.combo-list::-webkit-scrollbar-track,.store-dd-scroll::-webkit-scrollbar-track{background:transparent}
+      .modal-sheet::-webkit-scrollbar-thumb,.bsheet-list::-webkit-scrollbar-thumb,.combo-list::-webkit-scrollbar-thumb,.store-dd-scroll::-webkit-scrollbar-thumb{background:transparent;border-radius:99px;transition:background .35s ease}
+      .modal-sheet.scrolling::-webkit-scrollbar-thumb,.bsheet-list.scrolling::-webkit-scrollbar-thumb,.combo-list.scrolling::-webkit-scrollbar-thumb,.store-dd-scroll.scrolling::-webkit-scrollbar-thumb{background:var(--scroll-thumb)}
       @media (prefers-reduced-motion: reduce){ .toast{transition:none} }
       .page-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
       .page-top-main{min-width:0;flex:1 1 160px}
@@ -557,9 +557,13 @@
       /* 주문 생성하기 — 가게 선택 커스텀 드롭다운: 네이티브 select 대신 앱 디자인
          (둥근 모서리·틸 체크)으로 직접 그리고, 목록이 길면 패널 안에서 스크롤한다 */
       .store-dd{position:relative}
+      /* 껍데기(.store-dd-list)는 둥근 모서리·테두리·그림자만 갖고 overflow:hidden으로 안쪽을 잘라 낸다.
+         실제 스크롤은 안쪽 .store-dd-scroll이 맡는다 — 스크롤 요소를 직접 둥글게 만들면 모바일
+         브라우저가 스크롤바를 테두리 바깥(모서리 위)으로 그려 삐져나오는 일이 있어 나눴다 */
       .store-dd-list{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:46;background:var(--surface);
         border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 34px rgba(15,118,110,.16);
-        max-height:264px;overflow-y:auto;overscroll-behavior:contain;padding:6px}
+        overflow:hidden}
+      .store-dd-scroll{max-height:264px;overflow-y:auto;overscroll-behavior:contain;padding:6px}
       /* 가게 선택 드롭다운 방향 (A안·스마트 플립) — 아래 공간이 충분하면 지금처럼 아래로 열고,
          화면이 짧아 아래에 목록이 다 들어갈 공간이 없으면 위로 올려 연다.
          방향 판정은 스크립트(updateStoreDdFlip)가 열릴 때·창 크기/스크롤이 바뀔 때 계산해 .flip-up을 붙였다 뗀다 */
@@ -695,7 +699,7 @@
                   <span class="sp-name placeholder" id="newOrderStoreName">가게를 고르세요</span>
                   <span class="sp-chev" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 </button>
-                <div class="store-dd-list hidden" id="newOrderStoreList" role="listbox" aria-label="가게 목록"></div>
+                <div class="store-dd-list hidden" id="newOrderStoreList"><div class="store-dd-scroll" id="newOrderStoreScroll" role="listbox" aria-label="가게 목록"></div></div>
               </div>
             </div>
             <div>
@@ -2456,6 +2460,34 @@ function ocDecodeText(raw){
    기준본(baseline)은 ‘공유 채널이 알고 있는 마지막 상태’다: 내가 발행했거나 원격에서 받은
    상태로 맞추고, 발행 지점 한 곳(publishSync)에서만 diff를 만들어 핸들러들은 건드리지 않는다 */
 var ocBaseline = null, ocLastMts = 0, ocStateLoaded = false;
+/* 명단 후퇴 가드용 상태 — ocLocalRosterEdited는 이 기기에서 명단 편집(UI)이 실제로
+   있었을 때만 rosterChanged가 세운다. ocBaselineMetaMts는 기준본이 만들어진 시점의
+   명단 mts로, 로컬 명단이 병합에서 ‘이긴’ 명단인지 가릴 때 쓴다 (publishSync 가드 참고) */
+var ocLocalRosterEdited = false, ocBaselineMetaMts = 0;
+/* 로컬 명단이 기준 명단보다 파트·인원을 잃었는지 본다. 이름별 인원 합계·전체 인원·
+   그룹 children에 있던 파트 이름 중 하나라도 줄면 후퇴로 본다. membersOnly면
+   이름 자체가 바뀌는 경우(이름 바꾸기)를 후퇴로 오인하지 않게 인원 기준으로만 본다 */
+function ocRosterLoss(baseRoster, localRoster, membersOnly){
+  if (!baseRoster || !localRoster) return false;
+  function tally(r){
+    var names = {}, total = 0;
+    (Array.isArray(r.leaves) ? r.leaves : []).forEach(function(l){
+      if (!l || !l.name) return;
+      var c = Array.isArray(l.members) ? l.members.length : 0;
+      names[l.name] = (names[l.name] || 0) + c;
+      total += c;
+    });
+    return { names: names, total: total };
+  }
+  var b = tally(baseRoster), l = tally(localRoster);
+  if (l.total < b.total) return true;
+  if (membersOnly) return false; /* 이름 바꾸기는 인원 총량이 그대로라 여기서 걸리지 않는다 */
+  for (var n in b.names){ if ((l.names[n] || 0) < b.names[n]) return true; }
+  function childNames(r){ var s = {}; (Array.isArray(r.groups) ? r.groups : []).forEach(function(g){ (Array.isArray(g.children) ? g.children : []).forEach(function(c){ s[c] = 1; }); }); return s; }
+  var bc = childNames(baseRoster), lc = childNames(localRoster);
+  for (var cn in bc){ if (!lc[cn]) return true; }
+  return false;
+}
 var ocLastRemoteApplyAt = 0; /* 마지막으로 원격 델타·스냅샷을 반영한 시각 — 주문 생성 화면의 명단 고정이 동기화가 조용해질 때까지 기다리는 기준 */
 var lastCheckpointAt = 0, snapDirty = false, ocPendingDeltas = [], ocRetryingPending = false;
 /* ---------- 로컬 캐시 (새로고침 개선 1번) ----------
@@ -2629,7 +2661,7 @@ function ocBuildBaseline(s){
   var b = {}, ents = ocEntities(s);
   OC_COLS.forEach(function(col){
     b[col] = {};
-    ents[col].forEach(function(rec){ b[col][rec.id] = ocStripJson(rec.ent); if (typeof rec.ent.mts === "number" && rec.ent.mts > ocLastMts) ocLastMts = rec.ent.mts; });
+    ents[col].forEach(function(rec){ b[col][rec.id] = ocStripJson(rec.ent); if (typeof rec.ent.mts === "number" && rec.ent.mts > ocLastMts) ocLastMts = rec.ent.mts; if (col === "meta" && typeof rec.ent.mts === "number") ocBaselineMetaMts = rec.ent.mts; });
   });
   return b;
 }
@@ -2701,6 +2733,24 @@ function ocPublishSnapshotPlain(plain){
 function publishState(){ publishSync(false); }
 function publishSync(forceSnap){
   if (applyingRemote) return;
+  /* 명단 후퇴 가드 — 이 기기에서 명단 편집(UI)을 한 적이 없는데, 로컬 명단이 기준본보다
+     파트·인원을 잃은 상태라면 그 명단은 이 기기가 만든 변경이 아니라 어긋난 사본
+     (구버전 화면·오래된 캐시·이름 겹침을 뭉갠 병합 등)이다. 명단은 델타·스냅샷 모두
+     통째로 오가고 최신 mts가 전체를 이기는 구조라, 이런 사본이 한 번 발행되면 멀쩡한
+     공유 명단이 그대로 덮여 사라진다 (그룹이 다른 같은 이름 파트 ‘PL’이 한쪽은
+     맨 아래로 밀리고 다른 쪽은 사라진 사고). 발행 전에 기준본 명단으로 되돌려,
+     어긋난 사본이 밖으로 나가지 않게 한다. 실제로 편집한 기기는 rosterChanged가
+     ocLocalRosterEdited를 세워 이 가드를 지나가고, 병합에서 이긴 명단
+     (metaMts가 기준본보다 큰 경우)도 조건에서 빠져 그대로 발행된다 */
+  if (!ocLocalRosterEdited && ocBaseline && ocBaseline.meta && ocBaseline.meta.meta && (state.metaMts || 0) <= ocBaselineMetaMts){
+    try {
+      var baseMetaEnt = JSON.parse(ocBaseline.meta.meta);
+      if (baseMetaEnt && baseMetaEnt.roster && ocRosterLoss(baseMetaEnt.roster, state.roster)){
+        state.roster = cloneRoster(sanitizeRoster(baseMetaEnt.roster));
+        rebuildPartDefs(state.roster);
+      }
+    } catch(e){}
+  }
   var mode = ocSyncMode();
   var changes = [];
   if (mode !== "snap" && ocBaseline){ try { changes = ocCollectChanges(); } catch(e){ changes = []; } }
@@ -2722,6 +2772,7 @@ function publishSync(forceSnap){
         await ocPublishSnapshotPlain(JSON.stringify({ version: state.version, state: state }));
       }
       ocRebuildBaseline();
+      ocLocalRosterEdited = false; /* 발행이 끝나 기준본이 지금 상태와 같아졌으니 편집 표시는 내린다 */
       return;
     }
     if (wantSnap && plain !== lastSent){
@@ -2736,6 +2787,7 @@ function publishSync(forceSnap){
       else if (!(mode === "delta" && !meaningful && !ocStateLoaded)) await ocPublishSnapshotPlain(plain);
     } else if (plain !== lastSent) snapDirty = true;
     ocRebuildBaseline();
+    ocLocalRosterEdited = false; /* 발행이 끝나 기준본이 지금 상태와 같아졌으니 편집 표시는 내린다 */
   })();
 }
 /* 체크포인트 주기 점검: 변경이 쌓인 채 30분이 지나면 스냅샷을 한 번 내보낸다 */
@@ -2956,6 +3008,7 @@ function ocApplyDelta(col, id, msg){
         if (!ocBaseline[col]) ocBaseline[col] = {};
         var placed = ocFindEnt(state, col, id);
         if (placed) ocBaseline[col][id] = ocStripJson(placed);
+        if (col === "meta") ocBaselineMetaMts = msg.mts;
       }
     }
   } finally { applyingRemote = false; }
@@ -3413,6 +3466,14 @@ function mergeStatesOrders(localRaw, remoteRaw){
      굳어졌다. 명단은 델타와 같은 기준(metaMts가 큰 쪽)으로 통일한다 — 그룹·파트·
      인원은 한 덩어리(메타 항목 하나)로 오가므로, 이러면 셋이 갈라질 수 없다 */
   var rosterWin = (R.metaMts || 0) > (L.metaMts || 0) ? R : (L.metaMts || 0) > (R.metaMts || 0) ? L : base;
+  if ((R.metaMts || 0) === (L.metaMts || 0)){
+    /* metaMts 동률인데 명단 내용이 다르면 인원을 잃지 않는 쪽을 고른다 — 동률에서
+       뼈대(버전=마지막으로 만진 시각)만으로 고르면, 어긋난 사본을 든 기기의 명단이
+       멀쩡한 명단을 밀어내 파트·인원이 통째로 후퇴할 수 있다. 이름 바꾸기처럼
+       인원 총량이 그대로인 차이는 후퇴로 보지 않는다(membersOnly) */
+    if (ocRosterLoss(L.roster, R.roster, true)) rosterWin = L;
+    else if (ocRosterLoss(R.roster, L.roster, true)) rosterWin = R;
+  }
   base.roster = rosterWin.roster;
   var otherById = {};
   other.channels.forEach(function(c){ otherById[c.id] = c; });
@@ -3558,7 +3619,7 @@ window.addEventListener("pagehide", flushPendingPublish);
 document.addEventListener("scroll", function(ev){
   var el = ev.target;
   if (!el || el === document || !el.classList || !el.matches) return;
-  if (!el.matches(".modal-sheet, .bsheet-list, .combo-list, .store-dd-list")) return;
+  if (!el.matches(".modal-sheet, .bsheet-list, .combo-list, .store-dd-scroll")) return;
   el.classList.add("scrolling");
   if (el._scrollHideTimer) clearTimeout(el._scrollHideTimer);
   el._scrollHideTimer = setTimeout(function(){ el.classList.remove("scrolling"); }, 900);
@@ -4181,7 +4242,8 @@ function renderOrderStart(){
   /* 가게 선택 — 커스텀 드롭다운: 버튼에 고른 가게를 보여 주고, 목록은 사내·팝업스토어·사외
      그룹으로 묶어 패널 안에서 스크롤한다. 목록이 바뀔 때만 다시 그린다 (열어 둔 채로 튀지 않게) */
   var storeBtn = $("newOrderStoreBtn"), storeNameEl = $("newOrderStoreName"), storeList = $("newOrderStoreList");
-  if (storeBtn && storeNameEl && storeList){
+  var storeScroll = $("newOrderStoreScroll"); /* 실제 목록·스크롤은 껍데기 안쪽 스크롤러가 맡는다 */
+  if (storeBtn && storeNameEl && storeList && storeScroll){
     if (ui.newStoreId && !storeById(ui.newStoreId)) ui.newStoreId = "";
     var selStore = ui.newStoreId ? storeById(ui.newStoreId) : null;
     var btnText = selStore ? selStore.name : "가게를 고르세요";
@@ -4206,9 +4268,9 @@ function renderOrderStart(){
         }).join("");
       }).join("");
     }
-    if (storeList._ocHtml !== listHtml){
-      storeList.innerHTML = listHtml; storeList._ocHtml = listHtml;
-      Array.prototype.forEach.call(storeList.querySelectorAll("[data-store-id]"), function(b){
+    if (storeScroll._ocHtml !== listHtml){
+      storeScroll.innerHTML = listHtml; storeScroll._ocHtml = listHtml;
+      Array.prototype.forEach.call(storeScroll.querySelectorAll("[data-store-id]"), function(b){
         b.addEventListener("click", function(){
           ui.newStoreId = b.getAttribute("data-store-id") || "";
           _newStoreDdOpen = false;
@@ -5104,6 +5166,7 @@ function groupNameOfLeaf(name){
   return "";
 }
 function rosterChanged(){
+  ocLocalRosterEdited = true; /* 이 기기가 UI로 명단을 실제로 바꾼 기록 — publishSync의 명단 후퇴 가드가 이 편집을 막지 않게 한다 */
   rebuildPartDefs(state.roster); refreshStartSnapLocal(); touch();
   /* 명단 변경(파트·그룹 이름 바꾸기, 파트·그룹·인원 추가/삭제)은 즉시 발행 + 체크포인트까지 내보낸다.
      예전에는 touch()의 200ms 디바운스를 거쳐 델타로만 나갔고 전체 스냅샷은 30분·백그라운드
@@ -5183,7 +5246,7 @@ function renderParts(){
      사람 이름이 겹칠 수 있어 칩의 자리 번호(mindex)로 그 한 명만 뺀다 */
   Array.prototype.forEach.call(area.querySelectorAll("[data-del-member]"), function(b){
     b.addEventListener("click", function(){
-      var leaf = rosterLeafForScope(b.getAttribute("data-scope") || "__loose__", b.getAttribute("data-del-member")) || leafRoster(b.getAttribute("data-del-member")); if (!leaf) return;
+      var leaf = rosterLeafForScope(b.getAttribute("data-scope") || "__loose__", b.getAttribute("data-del-member")); if (!leaf) return;
       var n = b.getAttribute("data-name");
       var mi = parseInt(b.getAttribute("data-mindex"), 10);
       if (!isNaN(mi) && leaf.members[mi] === n) leaf.members.splice(mi, 1);
@@ -5295,8 +5358,9 @@ function closeMemberModal(fromPop){
 }
 function submitMemberAdd(){
   if (!ui.memberAdd) return;
-  var leaf = rosterLeafForScope(ui.memberAdd.scope, ui.memberAdd.part) || leafRoster(ui.memberAdd.part);
-  if (!leaf){ closeMemberModal(); return; }
+  /* scope 안에서만 찾는다 — 못 찾으면 다른 그룹의 같은 이름 파트에 넣지 않는다 */
+  var leaf = rosterLeafForScope(ui.memberAdd.scope, ui.memberAdd.part);
+  if (!leaf){ toast("‘" + ui.memberAdd.part + "’ 파트를 찾지 못했어요."); return; }
   var inp = $("memberNameInput");
   var n = inp ? inp.value.trim() : "";
   if (!n){ toast("추가할 이름을 입력하세요."); if (inp) inp.focus(); return; }
@@ -5418,14 +5482,14 @@ function saveRenameFromModal(){
     /* 파트 이름 중복 검사는 같은 그룹 안에서만 — 다른 그룹에 같은 이름이 있어도 된다 */
     if (groupRoster(newName)){ toast("이미 있는 그룹 이름이에요."); return; }
     if (rosterLeafForScope(t.scope || "__loose__", newName)){ toast("같은 그룹에 이미 있는 파트 이름이에요."); return; }
-    var leaf = rosterLeafForScope(t.scope || "__loose__", oldName) || leafRoster(oldName); if (!leaf) return;
+    /* scope 안에서만 찾는다 — 못 찾으면 다른 그룹의 같은 이름 파트를 대신 바꾸지 않는다 */
+    var leaf = rosterLeafForScope(t.scope || "__loose__", oldName);
+    if (!leaf){ toast("‘" + oldName + "’ 파트를 찾지 못했어요."); return; }
     leaf.name = newName;
     if (t.scope && t.scope !== "__loose__"){
       var hostGrp = groupRoster(t.scope);
       if (hostGrp){ var ci = hostGrp.children.indexOf(oldName); if (ci >= 0) hostGrp.children[ci] = newName; }
       leaf.group = t.scope;
-    } else if (!t.scope){
-      state.roster.groups.forEach(function(g){ g.children = g.children.map(function(c){ return c === oldName ? newName : c; }); });
     }
     ensureChannels().forEach(function(c){
       c.parts = (c.parts || []).map(function(x){ return x === oldName ? newName : x; });
@@ -5451,17 +5515,17 @@ function deleteFromRenameModal(){
   var t = ui.renameTarget; if (!t) return;
   var name = t.name;
   if (t.kind === "leaf"){
-    /* 파트 삭제 — 이름이 다른 그룹과 겹칠 수 있어, 그 그룹(scope)의 파트만 지운다 */
-    var leafObj = t.scope ? (rosterLeafForScope(t.scope, name) || leafRoster(name)) : leafRoster(name);
-    if (leafObj){
-      var li = state.roster.leaves.indexOf(leafObj);
-      if (li >= 0) state.roster.leaves.splice(li, 1);
-    }
-    if (t.scope && t.scope !== "__loose__"){
-      var hostGrp = groupRoster(t.scope);
+    /* 파트 삭제 — 이름이 다른 그룹과 겹칠 수 있어, 그 그룹(scope)의 파트만 지운다.
+       scope 안에서 찾지 못하면 다른 그룹의 같은 이름 파트를 대신 지우지 않고 중단한다 —
+       이름만으로 전역에서 찾는 폴백이 엉뚱한 그룹의 파트를 지울 수 있기 때문이다 */
+    var scope = t.scope || "__loose__";
+    var leafObj = rosterLeafForScope(scope, name);
+    if (!leafObj){ closeRenameModal(); toast("‘" + name + "’ 파트를 찾지 못했어요. 지우지 않았어요."); return; }
+    var li = state.roster.leaves.indexOf(leafObj);
+    if (li >= 0) state.roster.leaves.splice(li, 1);
+    if (scope !== "__loose__"){
+      var hostGrp = groupRoster(scope);
       if (hostGrp){ var ci = hostGrp.children.indexOf(name); if (ci >= 0) hostGrp.children.splice(ci, 1); }
-    } else if (!t.scope){
-      state.roster.groups.forEach(function(g){ g.children = g.children.filter(function(c){ return c !== name; }); });
     }
     ui.draft = null; ui.draftDirty = false;
     closeRenameModal();
@@ -5485,7 +5549,7 @@ function openDeleteConfirmModal(){
   var t = ui.renameTarget; if (!t) return;
   var name = t.name, body;
   if (t.kind === "leaf"){
-    var leafObj = t.scope ? (rosterLeafForScope(t.scope, name) || leafRoster(name)) : leafRoster(name);
+    var leafObj = rosterLeafForScope(t.scope || "__loose__", name);
     var cnt = leafObj && leafObj.members ? leafObj.members.length : 0;
     body = '파트 <span class="dc-name">‘' + esc(name) + '’</span>와 그 안의 인원 ' + cnt + '명을 지웁니다.'
       + '<span class="dc-note">이미 열린 채널의 명단은 그대로 유지돼요.</span>';
