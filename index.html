@@ -59,10 +59,6 @@
       /* 연결 상태 표시 — 작은 점 + 짧은 문구만 조용히 보여준다 */
       .sync-status{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);padding:2px;flex-wrap:wrap}
       .sync-status[data-state="connected"] #syncText{color:var(--green-text)}
-      /* 연결 진단 표시 — 헤더 연결 상태 아래 작은 글씨로 단계별 시각(performance.now 기준)을 남긴다.
-         회사망처럼 연결이 느린 환경에서 어느 단계에서 걸리는지 숫자로 가리기 위한 것이라 지우지 않는다 */
-      .sync-diag{font-size:11.5px;line-height:1.6;color:var(--muted);margin-top:3px;overflow-wrap:anywhere;word-break:keep-all}
-      .sync-diag b{color:var(--ink);font-weight:700}
       .dot{width:7px;height:7px;border-radius:50%;background:var(--line-strong);flex:none}
       .dot.on{background:var(--green)} .dot.busy{background:var(--accent);animation:dotpulse 1.2s ease-in-out infinite}
       @keyframes dotpulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -608,7 +604,6 @@
           <span class="dot busy" id="syncDot"></span>
           <span id="syncText">연결하는 중…</span>
         </div>
-        <div class="sync-diag" id="syncDiag" aria-label="연결 진단">진단 준비 중…</div>
       </header>
 
       <div class="ordermode-banner order-only">
@@ -1777,7 +1772,7 @@ var state = defaultState();
 var ui = { tab:"channel", orderTab:"order", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
-           newSel:[], newCustom:[], newCustomByGroup:{}, newStoreId:"", newLimit:"",
+           newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
            startSnap:null, startSnapFrozen:false, startSnapJson:"" };
 
 /* ---------- 팝업 뒤로 가기(History) 관리자 — 모든 팝업 공통 ----------
@@ -2340,7 +2335,7 @@ var lastRemoteRaw = "";     /* 마지막으로 받은 스냅샷 원문(암호문
 /* ---------- Firebase 설정 ----------
    실제 프로젝트 값으로 교체할 곳은 여기 한 곳뿐이다. Firebase 콘솔에서 웹 앱을
    등록하면 나오는 firebaseConfig 값을 그대로 넣으면 된다. 플레이스홀더인 동안은
-   연결을 시도하지 않고, 진단 표시에 ‘Firebase 설정 필요’로 표시된다 */
+   연결을 시도하지 않고, 연결 상태가 ‘연결 실패’로 표시된다 */
 var FIREBASE_CONFIG = {
   apiKey: "AIzaSyBZ-oLvXPahBb2nf7eEfGWE_Yo5J3vdgZ8",
   authDomain: "ordercollect-54f46.firebaseapp.com",
@@ -2398,39 +2393,6 @@ function refreshSubmitState(){
     }
   }
 }
-/* ---------- 연결 진단 표시 (살려 두는 계측) ----------
-   헤더 연결 상태 아래에 버전·방·브로커 모드(firestore)와 단계별 시각을
-   performance.now() 기준으로 실시간 표시한다. 회사 PC에서 새로고침이 느릴 때
-   어느 단계(캐시·SDK 대기·연결·스냅샷 도착·반영·델타 플러시·첫 동기화)에서
-   걸리는지 숫자로 가리기 위한 것 — 원인 진단이 끝나도 지우지 않는다 (동호 지시 2026-11-13).
-   숫자는 특별한 표시가 없으면 페이지 로드 뒤 흐른 ms(시각)이고, SDK만 대기
-   시간(구간 길이)이다. 아직 도달하지 않은 단계는 — 로 남는다 */
-var DIAG_BUILD = "2026-11-13-firestore-4";
-var diagState = { cacheHit:null, cacheMs:null, sdkWaitMs:null, connectMs:null, snapArriveMs:null, snapApplyMs:null, flushMs:null, flushCount:null, firstSyncMs:null };
-function diagNow(){ return Math.round(performance.now()); }
-function diagBrokerLabel(){ return "firestore"; }
-function diagRender(){
-  var el = $("syncDiag"); if (!el) return;
-  function v(x){ return x == null ? "—" : String(x); }
-  var cacheTxt = diagState.cacheHit == null ? "—" : ((diagState.cacheHit ? "적중 " : "미적중 ") + v(diagState.cacheMs));
-  var flushTxt = diagState.flushMs == null ? "—" : (diagState.flushMs + "(" + (diagState.flushCount || 0) + "개)");
-  el.innerHTML = "v" + (typeof BUILTIN_VERSION !== "undefined" ? BUILTIN_VERSION : "?")
-    + " · build " + DIAG_BUILD
-    + " · 방 " + (ROOM_FROM_LINK ? "링크방" : "기본방")
-    + " · 브로커 <b>" + esc(diagBrokerLabel()) + "</b>"
-    + (ocFirebaseConfigured() ? "" : " · <b>Firebase 설정 필요</b>")
-    + " · 캐시 " + esc(cacheTxt)
-    + " · SDK " + v(diagState.sdkWaitMs)
-    + " · 연결까지 " + v(diagState.connectMs)
-    + " · 스냅샷 " + v(diagState.snapArriveMs)
-    + " · 반영 " + v(diagState.snapApplyMs)
-    + " · 델타플러시 " + esc(flushTxt)
-    + " · 동기화 " + v(diagState.firstSyncMs)
-    + (fsLastErrCode ? " · <b>오류 " + esc(fsLastErrCode) + "</b>" : "");
-}
-function diagMarkConnect(){ if (diagState.connectMs == null){ diagState.connectMs = diagNow(); } diagRender(); }
-function diagMarkSnapArrive(){ if (diagState.snapArriveMs == null){ diagState.snapArriveMs = diagNow(); } diagRender(); }
-function diagMarkSnapApply(){ if (diagState.snapApplyMs == null){ diagState.snapApplyMs = diagNow(); } diagRender(); }
 function setSync(mode, text){
   var phase;
   if (mode === "on") phase = "connected";
@@ -2442,7 +2404,6 @@ function setSync(mode, text){
   var ss = $("syncStatus"); if (ss) ss.setAttribute("data-state", phase);
   /* 상태 문구는 단계별 짧은 문구로 고정한다 — 긴 설명 문장은 표시하지 않는다 */
   var st = $("syncText"); if (st) st.textContent = phase === "connected" ? "연결됨" : phase === "connecting" ? "연결하는 중…" : phase === "failed" ? "연결 실패" : "다시 연결하는 중…";
-  if (phase === "connected") diagMarkConnect(); else diagRender(); /* 진단 표시의 브로커 모드·단계도 상태 변화마다 함께 맞춘다 */
   refreshSubmitState();
 }
 function sha256hex(text){
@@ -2611,7 +2572,6 @@ function ocFlushInitialDeltas(){
   if (!ocInitialLoad) return;
   ocInitialLoad = false;
   var q = ocInitialDeltaQueue; ocInitialDeltaQueue = [];
-  if (diagState.flushMs == null){ diagState.flushMs = diagNow(); diagState.flushCount = q.length; diagRender(); }
   q.forEach(function(p){ ocApplyDelta(p.col, p.id, p.msg); });
   ocMarkFirstSyncDone("flush");
 }
@@ -2623,7 +2583,6 @@ var ocFirstSyncDone = false, ocPendingSeedCheck = false, ocProbesScheduled = fal
 function ocMarkFirstSyncDone(reason){
   if (ocFirstSyncDone) return;
   ocFirstSyncDone = true;
-  if (diagState.firstSyncMs == null){ diagState.firstSyncMs = diagNow(); diagRender(); }
   ocScheduleDeferredProbes();
 }
 function ocScheduleDeferredProbes(){
@@ -2782,6 +2741,13 @@ function ocPublishOneDelta(ch){
       col: ch.col, id: String(ch.id), payload: enc || text, seq: seq, mts: ch.mts
     }).then(function(){}, function(){});
   });
+}
+/* 델타 목록을 순서대로 한 건씩 내보낸다 — seq가 방 단위 단조 증가라 병렬로 쓰면
+   순서가 뒤집힐 수 있어 직렬로 잇는다 */
+function ocPublishDeltaList(list){
+  var p = Promise.resolve();
+  (list || []).forEach(function(ch){ p = p.then(function(){ return ocPublishOneDelta(ch); }); });
+  return p;
 }
 /* 모든 항목을 델타로 한 번씩 내보낸다 — 전용 브로커에 처음 심을 때, 새 기기가 델타만으로
    전체를 복원할 수 있게 retained 델타를 채우는 용도. mts가 없는 항목에만 새로 찍는다 */
@@ -3212,8 +3178,6 @@ function fsNoteServerContact(metadata){
     fsConnected = true;
     fsConnectedOnce = true;
     setSync("on", "연결됨");
-  } else {
-    diagRender();
   }
 }
 /* 리스너 오류는 영구 실패가 아니다 — 서버 규칙 거부(permission-denied)나 일시적인
@@ -3221,7 +3185,7 @@ function fsNoteServerContact(metadata){
    박혀 새로고침 전까지 복구가 없었고 어느 쪽 리스너가 왜 죽었는지도 안 보였다.
    이제는 죽은 리스너만 떼어 표시하고(다른 리스너는 계속 산다), 백오프로 다시
    붙인다. 서버 쪽에서 규칙이 고쳐지면 새로고침 없이 스스로 ‘연결됨’으로 돌아온다.
-   오류 코드는 진단 표시 끝에 남겨, 다음에 또 실패해도 코드를 보고 원인을 가릴 수
+   오류 코드는 콘솔 경고에 남겨, 다음에 또 실패해도 코드를 보고 원인을 가릴 수
    있게 한다 */
 function fsOnListenerError(which){
   return function(err){
@@ -3233,7 +3197,6 @@ function fsOnListenerError(which){
     fsScheduleRetry();
     if (!fsConnectedOnce) setSync("", "연결 실패");
     else if (!fsConnected) setSync("busy", "다시 연결하는 중…");
-    else diagRender();
   };
 }
 /* 죽은 리스너 재부착 백오프 — 3초에서 시작해 60초에서 멈춘다. 살아 있는 리스너가
@@ -3262,7 +3225,6 @@ function fsAttachListeners(){
     if (data && typeof data.payload === "string" && data.payload){
       gotFsState = true;
       if (data.payload !== lastRemoteRaw){
-        diagMarkSnapArrive();
         applyRemoteState(data.payload);
       }
     }
@@ -3302,18 +3264,16 @@ function connectRoom(code){
     fsRoomId = h;
     /* SDK는 헤드의 클래식 스크립트(compat 빌드)라 보통 즉시 준비돼 있다.
        로드에 실패한 경우에만 짧게(최대 5초) 기다린다 */
-    var waitTries = 0, waitSdkStart = performance.now();
+    var waitTries = 0;
     (function waitSdk(){
       if (typeof firebase === "undefined" || !firebase.firestore){
         if (++waitTries > 100){
-          diagState.sdkWaitMs = Math.round(performance.now() - waitSdkStart); diagRender();
           setSync("", "연결 실패");
           return;
         }
         setTimeout(waitSdk, 50);
         return;
       }
-      diagState.sdkWaitMs = Math.round(performance.now() - waitSdkStart); diagRender();
       fsInitAndListen();
     })();
   });
@@ -3321,9 +3281,8 @@ function connectRoom(code){
 function fsInitAndListen(){
   if (!ocFirebaseConfigured()){
     /* 플레이스홀더 상태에서는 연결을 시도하지 않는다 — 캐시로 그린 화면은 그대로
-       쓸 수 있고, 진단 표시에 ‘Firebase 설정 필요’가 남는다 */
+       쓸 수 있고, 연결 상태는 ‘연결 실패’로 표시된다 */
     setSync("", "연결 실패");
-    diagRender();
     return;
   }
   try {
@@ -3534,7 +3493,6 @@ function applyRemoteState(raw){
       ocRetryPending();
       schedulePruneExpiredChannels(); /* 동기화로 받은 주문도 7일이 지났으면 정리한다 */
       ocSaveCacheSoon(); /* 병합이 끝난 상태가 곧 캐시의 최신본이다 */
-      diagMarkSnapApply();
       ocFlushInitialDeltas(); /* 스냅샷이 먼저 그려졌으니 모아 둔 델타를 이제 한 번에 적용한다 */
       return;
     }
@@ -3547,7 +3505,6 @@ function applyRemoteState(raw){
     ocRetryPending();
     schedulePruneExpiredChannels(); /* 동기화로 받은 주문도 7일이 지났으면 정리한다 */
     ocSaveCacheSoon(); /* 병합이 끝난 상태가 곧 캐시의 최신본이다 */
-    diagMarkSnapApply();
     ocFlushInitialDeltas(); /* 스냅샷이 먼저 그려졌으니 모아 둔 델타를 이제 한 번에 적용한다 */
     if (mergedFp !== remoteFp) scheduleRepublish();
   });
@@ -4042,19 +3999,32 @@ function leafPartOfName(n){
   for (var i = 0; i < leaves.length; i++) if (leaves[i].members.indexOf(n) >= 0) return leaves[i].name;
   return null;
 }
-function scopeStateOf(names){
-  if (!names.length) return "none";
+/* 추가 인원의 선택 상태는 명단 선택(ui.newSel — 이름 기준)과 분리해 ‘그룹+이름’ 키로
+   따로 든다(ui.newCustomSel). 동명이인을 추가 인원으로 넣어도 명단에 있는 같은 이름
+   사람의 칩과 선택 상태가 공유되지 않게 하기 위해서다 */
+function customSelKey(g, n){ return (g || "") + "\u0001" + n; }
+function customSelList(){
+  if (!Array.isArray(ui.newCustomSel)) ui.newCustomSel = [];
+  return ui.newCustomSel;
+}
+function customIsSelected(g, n){ return customSelList().indexOf(customSelKey(g, n)) >= 0; }
+function scopeStateOf(names, customKeys){
+  var total = names.length + (customKeys ? customKeys.length : 0);
+  if (!total) return "none";
   var sel = 0;
   names.forEach(function(n){ if (ui.newSel.indexOf(n) >= 0) sel++; });
+  if (customKeys) customKeys.forEach(function(k){ if (customSelList().indexOf(k) >= 0) sel++; });
   if (sel === 0) return "none";
-  return sel === names.length ? "all" : "some";
+  return sel === total ? "all" : "some";
 }
-function toggleScopeNames(names){
+function toggleScopeNames(names, customKeys){
   freezeStartSnapNow(); /* 인원 선택을 시작하면 그 시점 명단으로 고정한다 */
-  if (scopeStateOf(names) === "all"){
+  if (scopeStateOf(names, customKeys) === "all"){
     ui.newSel = ui.newSel.filter(function(n){ return names.indexOf(n) < 0; });
+    if (customKeys && customKeys.length) ui.newCustomSel = customSelList().filter(function(k){ return customKeys.indexOf(k) < 0; });
   } else {
     names.forEach(function(n){ if (ui.newSel.indexOf(n) < 0) ui.newSel.push(n); });
+    if (customKeys) customKeys.forEach(function(k){ if (customSelList().indexOf(k) < 0) ui.newCustomSel.push(k); });
   }
   renderOrderStart();
 }
@@ -4069,14 +4039,6 @@ function customListFor(groupName){
   var k = groupName || "";
   if (!Array.isArray(ui.newCustomByGroup[k])) ui.newCustomByGroup[k] = [];
   return ui.newCustomByGroup[k];
-}
-function allCustomNames(){
-  var out = [], seen = {};
-  Object.keys(ui.newCustomByGroup || {}).forEach(function(k){
-    (ui.newCustomByGroup[k] || []).forEach(function(n){ if (!seen[n]){ seen[n] = 1; out.push(n); } });
-  });
-  (ui.newCustom || []).forEach(function(n){ if (!seen[n]){ seen[n] = 1; out.push(n); } });
-  return out;
 }
 function extraInputFor(groupName){
   var inputs = document.querySelectorAll("[data-extra-input]");
@@ -4110,7 +4072,7 @@ function renderOrderStart(){
     if (inp.value) extraVals[g] = inp.value;
     if (document.activeElement === inp) extraFocusGroup = g;
   });
-  totalEl.innerHTML = "인원 · <b>" + ui.newSel.length + "명</b> 선택됨";
+  totalEl.innerHTML = "인원 · <b>" + (ui.newSel.length + customSelList().length) + "명</b> 선택됨";
   /* 파트 트리 — 그룹(Media) 카드 안에 하위 파트가 중첩되고, 헤더 행 전체가 큰 탭 영역이다.
      파트별 인원 수는 표시하지 않는다 (상단 전체 합계만) */
   var tree = $("newPartTree");
@@ -4129,8 +4091,8 @@ function renderOrderStart(){
          입력·버튼은 그룹이 여럿이라 id 대신 data-extra-group으로 그룹을 구분한다 */
       var g = groupName || "";
       var chips = '<div class="member-chips">' + customListFor(g).map(function(n){
-          var on = ui.newSel.indexOf(n) >= 0;
-          return '<button type="button" class="member-chip" data-member="' + esc(n) + '" aria-pressed="' + on + '">' + esc(n) + "</button>";
+          var on = customIsSelected(g, n);
+          return '<button type="button" class="member-chip" data-custom-member="' + esc(n) + '" data-custom-group="' + esc(g) + '" aria-pressed="' + on + '">' + esc(n) + "</button>";
         }).join("") + "</div>";
       return '<div class="subpart extra-part"><div class="extra-head"><span class="scope-name">추가 인원</span></div>'
         + chips
@@ -4151,8 +4113,8 @@ function renderOrderStart(){
         if (leaf) leaf.members.forEach(function(n){ if (!seen[n]){ seen[n] = 1; scopeNames.push(n); } });
       });
       snapGroupExtras(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; scopeNames.push(n); } });
-      customListFor(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; scopeNames.push(n); } });
-      var gst = scopeStateOf(scopeNames);
+      var customKeys = customListFor(g.name).map(function(n){ return customSelKey(g.name, n); });
+      var gst = scopeStateOf(scopeNames, customKeys);
       var inner = g.children.map(function(cn){
         var leaf = snapLeafFor(g.name, cn);
         return leaf ? subpartHtml(leaf, g.name) : "";
@@ -4181,8 +4143,8 @@ function renderOrderStart(){
             if (leaf) leaf.members.forEach(function(n){ if (!seen[n]){ seen[n] = 1; names.push(n); } });
           });
           snapGroupExtras(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; names.push(n); } });
-          customListFor(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; names.push(n); } });
-          toggleScopeNames(names);
+          var customKeys = customListFor(g.name).map(function(n){ return customSelKey(g.name, n); });
+          toggleScopeNames(names, customKeys);
         });
       });
       Array.prototype.forEach.call(tree.querySelectorAll("[data-scope-leaf]"), function(b){
@@ -4197,6 +4159,17 @@ function renderOrderStart(){
           freezeStartSnapNow(); /* 인원 선택을 시작하면 그 시점 명단으로 고정한다 */
           var n = b.getAttribute("data-member"), i = ui.newSel.indexOf(n);
           if (i >= 0) ui.newSel.splice(i, 1); else ui.newSel.push(n);
+          renderOrderStart();
+        });
+      });
+      /* 추가 인원 칩은 명단 칩과 별도 선택 목록(ui.newCustomSel)으로 토글한다 —
+         이름이 같아도 명단 사람의 선택 상태와 서로 영향을 주지 않는다 */
+      Array.prototype.forEach.call(tree.querySelectorAll("[data-custom-member]"), function(b){
+        b.addEventListener("click", function(){
+          freezeStartSnapNow();
+          var k = customSelKey(b.getAttribute("data-custom-group") || "", b.getAttribute("data-custom-member"));
+          var list = customSelList(), i = list.indexOf(k);
+          if (i >= 0) list.splice(i, 1); else list.push(k);
           renderOrderStart();
         });
       });
@@ -4268,7 +4241,7 @@ function enterOrderScreen(channelId){
 }
 /* ‘주문 시작’ — 선택 인원·가게·인당 제한으로 채널을 자동 생성(제목도 자동)하고 주문 화면으로 넘어간다 */
 function startNewOrder(){
-  if (!ui.newSel.length){ toast("인원을 한 명 이상 선택해 주세요."); return; }
+  if (!ui.newSel.length && !customSelList().length){ toast("인원을 한 명 이상 선택해 주세요."); return; }
   var store = ui.newStoreId ? storeById(ui.newStoreId) : null;
   if (!store){ toast("가게를 골라 주세요."); _newStoreDdOpen = true; renderOrderStart(); var sb = $("newOrderStoreBtn"); if (sb) sb.focus(); return; }
   var rawLim = String(ui.newLimit == null ? "" : ui.newLimit).trim();
@@ -4286,6 +4259,12 @@ function startNewOrder(){
       mm[lp].push(name);
     } else if (customs.indexOf(name) < 0) customs.push(name);
   });
+  /* 추가 인원 칩에서 고른 사람은 명단에 같은 이름이 있어도 파트 소속이 아니라
+     추가 인원(extraMembers)으로 넣는다 — 칩 선택이 독립적인 것과 같은 기준이다 */
+  customSelList().forEach(function(k){
+    var n = k.slice(k.indexOf("\u0001") + 1);
+    if (n && customs.indexOf(n) < 0) customs.push(n);
+  });
   /* 이름만으로 추가한 사람만 있을 때도 명단이 유지되게 ‘개별 추가’ 스냅샷을 함께 남긴다 (중복은 표시 단계에서 한 번만 보인다) */
   if (!parts.length && customs.length) mm["개별 추가"] = customs.slice();
   var target = defaultChannel(uid("ch"));
@@ -4302,7 +4281,7 @@ function startNewOrder(){
   target.orders = []; target.skips = [];
   target.createdAt = Date.now(); /* 7일 자동 만료의 기준 시각 */
   ensureChannels().push(target);
-  ui.newSel = []; ui.newCustom = []; ui.newCustomByGroup = {}; ui.newStoreId = ""; ui.newLimit = "";
+  ui.newSel = []; ui.newCustom = []; ui.newCustomByGroup = {}; ui.newCustomSel = []; ui.newStoreId = ""; ui.newLimit = "";
   var limEl = $("newOrderLimit"); if (limEl) limEl.value = "";
   touch();
   publishState();
@@ -6045,7 +6024,9 @@ function splitNameInput(raw){
 /* 추가 인원 추가 (A안) — groupName은 어느 그룹 카드의 입력인지. 그 그룹에서 추가한 사람은
    그 그룹의 추가 인원으로 들어간다. 명단(파트)에 같은 이름이 있어도, 이미 선택돼 있어도
    막지 않는다 — 동명이인을 새로 추가하는 것이므로 그 그룹의 ‘추가 인원’ 카드에
-   다른 구성원과 똑같은 연한 초록 칩으로 넣고 선택 상태로 만든다.
+   다른 구성원과 똑같은 연한 초록 칩으로 넣고 선택 상태로 만든다. 선택 상태는 명단
+   선택과 분리된 ui.newCustomSel(그룹+이름 키)에만 기록하므로, 명단에 있는 같은 이름
+   사람의 칩은 함께 눌리지 않는다.
    막는 경우는 그 그룹의 추가 인원에 이미 같은 이름이 들어 있을 때뿐이다.
    입력에 쉼표가 있으면 이름 여러 개로 나눠 한 번에 추가한다 */
 function addCustomNameFromInput(groupName){
@@ -6059,7 +6040,8 @@ function addCustomNameFromInput(groupName){
     if (list.indexOf(n) >= 0){ if (dup.indexOf(n) < 0) dup.push(n); return; }
     list.push(n); added.push(n);
     if (ui.newCustom.indexOf(n) < 0) ui.newCustom.push(n);
-    if (ui.newSel.indexOf(n) < 0) ui.newSel.push(n);
+    var ck = customSelKey(g, n);
+    if (customSelList().indexOf(ck) < 0) ui.newCustomSel.push(ck);
   });
   if (!added.length){
     toast("‘" + dup.join("’, ‘") + "’님은 추가 인원에 이미 있어요.");
@@ -6610,7 +6592,6 @@ $("clearOrdersBtn").addEventListener("click", function(){
 
 syncPriceFields();
 ocLoadCache(); /* 마지막으로 복호한 상태가 로컬에 있으면 기본값 대신 캐시부터 그린다 — Firestore 상태는 연결 뒤에 병합된다 (새로고침 개선 1번) */
-diagState.cacheHit = !!ocFromCache; diagState.cacheMs = diagNow(); diagRender(); /* 진단 표시: 캐시 적중 여부와 읽기가 끝난 시각 */
 mergeBuiltinStores(state); /* 첫 화면부터 기본 가게가 보이게 (공유 데이터가 도착하면 normalizeState가 다시 병합) */
 if (ocFromCache) ocRebuildBaseline(); /* 캐시+기본 가게 병합까지 끝난 상태를 발행 기준본으로 삼아 캐시 내용이 델타로 재발행되지 않게 한다 */
 ui.urlChannelId = channelIdFromUrl();
