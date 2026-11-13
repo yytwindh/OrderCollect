@@ -16,7 +16,7 @@
       :root{
         --bg:#F7FAF9; --surface:#FFFFFF; --surface-2:#EFF7F2; --ink:#1F2937; --muted:#5A6B62;
         --line:#DCE9E1; --line-strong:#B7D8C6; --accent:#0F766E; --accent-ink:#FFFFFF; --accent-soft:#D1FAE5;
-        --green:#57B98A; --green-text:#0E7A4F; --green-soft:#DCF5E7; --chip:#E9F3ED; --danger:#D64541; --danger-soft:#FDECEA;
+        --green:#57B98A; --green-text:#0E7A4F; --green-soft:#DCF5E7; --chip:#E9F3ED; --danger:#D64541; --danger-soft:#FDECEA; --danger-solid:#C63631; --danger-solid-hover:#A92C28; --danger-line:#F0B8B3;
         --mint:#D1FAE5; --peach:#FFE1CF; --butter:#FCEFC3; --sky:#CDEFF2; --pink:#FBDCE8; --lav:#DCE9FB;
         --shadow:0 2px 6px rgba(15,118,110,.05),0 16px 36px rgba(15,118,110,.09);
         --scroll-thumb:rgba(15,118,110,.42);
@@ -26,7 +26,7 @@
         :root{
           --bg:#0D1B16; --surface:#16261F; --surface-2:#1D2F27; --ink:#EDF5F0; --muted:#9DB4A7;
           --line:#263B31; --line-strong:#38584A; --accent:#0F766E; --accent-ink:#FFFFFF; --accent-soft:#17443A;
-          --green:#4FB286; --green-text:#7BD8AE; --green-soft:#1E4030; --chip:#22362C; --danger:#FF9A92; --danger-soft:#422825;
+          --green:#4FB286; --green-text:#7BD8AE; --green-soft:#1E4030; --chip:#22362C; --danger:#FF9A92; --danger-soft:#422825; --danger-solid:#C63631; --danger-solid-hover:#A92C28; --danger-line:#6E3B36;
           --mint:#1E4034; --peach:#4A3428; --butter:#4A4023; --sky:#1F4045; --pink:#4A2F3D; --lav:#2A3E55;
           --shadow:0 2px 6px rgba(0,0,0,.3),0 16px 36px rgba(0,0,0,.3);
           --scroll-thumb:rgba(123,216,174,.5);
@@ -41,7 +41,7 @@
       button{font:inherit;cursor:pointer}
       input,select,textarea{font:inherit;color:var(--ink)}
       .wrap{max-width:1060px;margin:0 auto;padding:14px 12px 64px}
-      @media (min-width:1024px){ .wrap{max-width:1480px;padding:18px 24px 72px} }
+      @media (min-width:1024px){ .wrap{max-width:1720px;padding:18px 24px 72px} }
       h1{font-size:clamp(23px,4vw,30px);line-height:1.2;margin:0;letter-spacing:-.02em;font-weight:800}
       h2{font-size:17px;margin:0 0 3px;letter-spacing:-.01em;font-weight:800}
       h3{font-size:15px;margin:0;font-weight:800}
@@ -260,9 +260,23 @@
       .partadd-card .pa-label{font-size:15px;font-weight:800}
       .partadd-card:hover{border-color:var(--accent)}
       /* 이름 바꾸기 팝업 안의 삭제 영역 — 파트·그룹 삭제는 여기에만 있다 */
-      .delzone{margin-top:16px;background:var(--danger-soft);border-radius:16px;padding:12px 14px}
+      .delzone{margin-top:16px;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:16px;padding:14px}
       .delzone .dtitle{font-size:13px;font-weight:800;color:var(--danger);margin-bottom:4px}
-      .delzone p{font-size:13.5px;margin-bottom:10px}
+      /* 삭제 버튼 — 안내 박스와 배경색이 같아 글자처럼 묻히던 문제 수정:
+         박스 안에서만 쓰는 진한 빨강 채움 버튼으로, 테두리·그림자·휴지통 아이콘·
+         박스 너비 전체를 쓰는 큰 눌림 영역까지 갖춰 누가 봐도 버튼으로 보이게 한다.
+         (아이콘은 CSS로 그린다 — JS가 textContent로 '파트 삭제/그룹 삭제'를 바꿔 써도 남는다) */
+      .delzone .btn.danger{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+        min-height:52px;padding:12px 20px;font-size:15.5px;font-weight:800;letter-spacing:-.01em;
+        background:var(--danger-solid);border:1.5px solid var(--danger-solid);color:#fff;
+        box-shadow:0 4px 14px rgba(198,54,49,.30),0 1px 3px rgba(198,54,49,.25)}
+      .delzone .btn.danger::before{content:"";flex:none;width:19px;height:19px;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2'/%3E%3Cpath d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E");
+        background-size:contain;background-repeat:no-repeat;background-position:center}
+      .delzone .btn.danger:hover{background:var(--danger-solid-hover);border-color:var(--danger-solid-hover)}
+      .delzone .btn.danger:active{transform:translateY(1px);box-shadow:0 1px 4px rgba(198,54,49,.25)}
+      .delzone .btn.danger:focus-visible{outline:3px solid var(--danger);outline-offset:2px}
+      @media (prefers-reduced-motion: reduce){ .delzone .btn.danger:active{transform:none} }
       .iconbtn{border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);width:30px;height:30px;min-height:30px;border-radius:50%;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:none}
       .iconbtn:hover{border-color:var(--accent)}
       /* 새 그룹 만들기 카드 (A안) — 그룹 카드와 같은 크기의 큰 틸 카드, 그룹 목록 마지막에 둔다. 라벨만 있고 부연 설명은 없다 */
@@ -510,6 +524,12 @@
         .subparts{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
         .start-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
         .media-card{padding:12px}
+        /* PC에서는 파트 카드당 인원을 한 줄에 5명씩 넣는다 — 칩 영역을 5열 그리드로
+           꽉 채워 늘리면 다섯 번째 칩 뒤에 남는 공간이 따로 생기지 않고,
+           오른쪽 여백이 왼쪽 간격(파트 카드 padding 8px + 칩 영역 padding 2px)과
+           똑같은 10px로 맞춰진다. 칩 좌우 padding을 줄여 세 글자 이름도 열 안에 들어간다 */
+        .member-chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+        .member-chip{min-width:0;padding-left:2px;padding-right:2px;display:flex;align-items:center;justify-content:center;text-align:center;white-space:nowrap}
         /* PC(넓은 화면)에서는 헤더(제목·연결 상태·관리 버튼)와 인원 선택 카드를
            하나의 덩어리로 묶어 화면 세로 가운데에 같이 둔다 — 헤더가 맨 위에 붙고
            카드만 가운데에 떠서 서로 떨어져 보이지 않게 한다 (주문 화면에는 적용하지 않는다) */
@@ -1082,8 +1102,6 @@
           <button class="btn ghost" id="renameCancelBtn" type="button">취소</button>
         </div>
         <div class="delzone">
-          <div class="dtitle" id="renameDeleteTitle">파트 삭제</div>
-          <p id="renameDeleteNote"></p>
           <button class="btn danger" id="renameDeleteBtn" type="button">파트 삭제</button>
         </div>
       </div>
@@ -3427,10 +3445,19 @@ function resyncFromBroker(){
   }
 }
 document.addEventListener("visibilitychange", function(){ if (!document.hidden) resyncFromBroker(); });
-/* 앱이 백그라운드로 갈 때는 체크포인트 스냅샷을 한 번 내보낸다 (delta 모드의 스냅샷 역할) */
+/* 앱이 백그라운드로 가거나 페이지가 내려갈 때는 밀린 발행을 즉시 내보낸다.
+   예전에는 snapDirty인 경우만 체크포인트를 내보냈는데, touch()의 200ms 디바운스가 아직
+   안 돈 변경은 snapDirty가 서 있지 않아, 바꾸자마자 뒤로 가기·새로고침을 하면 그 변경이
+   발행되지 않은 채 페이지와 함께 사라졌다 (파트 이름 바꾸기가 되돌아간 원인 중 하나).
+   디바운스가 걸려 있으면 기다리지 않고 바로 체크포인트 발행으로 넘긴다 */
+function flushPendingPublish(){
+  if (publishDeb){ clearTimeout(publishDeb); publishDeb = null; publishSync(true); return; }
+  if (ocSyncMode() === "delta" && snapDirty && hasMeaningfulState(state)) publishSync(true);
+}
 document.addEventListener("visibilitychange", function(){
-  if (document.hidden && ocSyncMode() === "delta" && snapDirty && hasMeaningfulState(state)) publishSync(true);
+  if (document.hidden) flushPendingPublish();
 });
+window.addEventListener("pagehide", flushPendingPublish);
 /* 팝업 스크롤바 A안: 팝업 안 스크롤 영역(.modal-sheet·.bsheet-list)은 스크롤하는 동안만
    .scrolling을 붙여 얇은 둥근 손잡이를 보여 주고, 멈추면 0.9초 뒤 떼어 사라지게 한다 */
 document.addEventListener("scroll", function(ev){
@@ -4981,7 +5008,17 @@ function groupNameOfLeaf(name){
   for (var i = 0; i < state.roster.groups.length; i++) if (state.roster.groups[i].children.indexOf(name) >= 0) return state.roster.groups[i].name;
   return "";
 }
-function rosterChanged(){ rebuildPartDefs(state.roster); refreshStartSnapLocal(); touch(); }
+function rosterChanged(){
+  rebuildPartDefs(state.roster); refreshStartSnapLocal(); touch();
+  /* 명단 변경(파트·그룹 이름 바꾸기, 파트·그룹·인원 추가/삭제)은 즉시 발행 + 체크포인트까지 내보낸다.
+     예전에는 touch()의 200ms 디바운스를 거쳐 델타로만 나갔고 전체 스냅샷은 30분·백그라운드
+     체크포인트 때만 나갔다. 그래서 이름을 바꾸자마자 뒤로 가기·새로고침을 하면 암호화 발행이
+     끝나기 전에 페이지가 내려가 델타가 유실되거나, 브로커에 retained로 남은 옛 스냅샷이
+     새 델타보다 먼저 도착해 방금 바꾼 이름이 이전으로 돌아간 것처럼 보였다.
+     명단은 델타와 스냅샷 양쪽에 새 이름으로 실어 두면 어느 쪽을 먼저 읽어도 되돌아가지 않는다 */
+  if (publishDeb){ clearTimeout(publishDeb); publishDeb = null; }
+  publishSync(true);
+}
 function renderParts(){
   var area = $("partsArea"); if (!area) return;
   if (!state.roster) state.roster = cloneRoster(DEFAULT_ROSTER);
@@ -5262,14 +5299,7 @@ function openRenameModal(kind, name, scope){
   var isGroup = kind === "group";
   $("renameFormTitle").textContent = (isGroup ? "그룹" : "파트") + " 이름 바꾸기 — " + name;
   $("renameInput").value = name;
-  $("renameDeleteTitle").textContent = isGroup ? "그룹 삭제" : "파트 삭제";
   $("renameDeleteBtn").textContent = isGroup ? "그룹 삭제" : "파트 삭제";
-  if (isGroup){
-    $("renameDeleteNote").textContent = "그룹만 삭제되고, 그 아래 파트와 인원은 ‘그룹 없는 파트’에 그대로 남아 있어요. 이미 열린 채널의 명단은 그대로 유지돼요.";
-  } else {
-    var leaf = rosterLeafForScope(scope || "__loose__", name) || leafRoster(name);
-    $("renameDeleteNote").textContent = "삭제하면 ‘" + name + "’ 파트와 그 안의 인원 " + (leaf ? leaf.members.length : 0) + "명이 함께 삭제돼요. 이미 열린 채널의 명단은 그대로 유지돼요.";
-  }
   var modal = $("renameModal"); if (!modal) return;
   modal.classList.remove("hidden");
   _trackModalOpen("renameModal");
