@@ -259,24 +259,18 @@
       .partadd-card .pa-plus{font-size:26px;font-weight:800;line-height:1}
       .partadd-card .pa-label{font-size:15px;font-weight:800}
       .partadd-card:hover{border-color:var(--accent)}
-      /* 이름 바꾸기 팝업 안의 삭제 영역 — 파트·그룹 삭제는 여기에만 있다 */
-      .delzone{margin-top:16px;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:16px;padding:14px}
-      .delzone .dtitle{font-size:13px;font-weight:800;color:var(--danger);margin-bottom:4px}
-      /* 삭제 버튼 — 안내 박스와 배경색이 같아 글자처럼 묻히던 문제 수정:
-         박스 안에서만 쓰는 진한 빨강 채움 버튼으로, 테두리·그림자·휴지통 아이콘·
-         박스 너비 전체를 쓰는 큰 눌림 영역까지 갖춰 누가 봐도 버튼으로 보이게 한다.
-         (아이콘은 CSS로 그린다 — JS가 textContent로 '파트 삭제/그룹 삭제'를 바꿔 써도 남는다) */
-      .delzone .btn.danger{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
-        min-height:52px;padding:12px 20px;font-size:15.5px;font-weight:800;letter-spacing:-.01em;
-        background:var(--danger-solid);border:1.5px solid var(--danger-solid);color:#fff;
-        box-shadow:0 4px 14px rgba(198,54,49,.30),0 1px 3px rgba(198,54,49,.25)}
-      .delzone .btn.danger::before{content:"";flex:none;width:19px;height:19px;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2'/%3E%3Cpath d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E");
-        background-size:contain;background-repeat:no-repeat;background-position:center}
-      .delzone .btn.danger:hover{background:var(--danger-solid-hover);border-color:var(--danger-solid-hover)}
-      .delzone .btn.danger:active{transform:translateY(1px);box-shadow:0 1px 4px rgba(198,54,49,.25)}
-      .delzone .btn.danger:focus-visible{outline:3px solid var(--danger);outline-offset:2px}
-      @media (prefers-reduced-motion: reduce){ .delzone .btn.danger:active{transform:none} }
+      /* 이름 바꾸기 팝업 안의 삭제 영역 — 파트·그룹 삭제는 여기에만 있다.
+         A안(작은 텍스트): 안내 박스와 큰 버튼을 없애고 작은 빨간 글자만 남긴다.
+         눌러도 바로 지워지지 않고 삭제 확인 팝업(#deleteConfirmModal)이 한 번 뜬다 */
+      .delzone{margin-top:18px;text-align:right}
+      .deltext{display:inline-block;background:none;border:0;padding:6px 4px;font:inherit;
+        font-size:13.5px;font-weight:700;color:var(--danger);cursor:pointer}
+      .deltext:hover{text-decoration:underline}
+      .deltext:focus-visible{outline:2px solid var(--danger);outline-offset:2px;border-radius:6px}
+      /* 삭제 확인 팝업 본문 — 지워지는 내용을 줄 단위로 보여 준다 */
+      .delconfirm-body{font-size:14.5px;line-height:1.55}
+      .delconfirm-body .dc-name{font-weight:800}
+      .delconfirm-body .dc-note{display:block;margin-top:8px;font-size:13.5px;color:var(--muted)}
       .iconbtn{border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);width:30px;height:30px;min-height:30px;border-radius:50%;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:none}
       .iconbtn:hover{border-color:var(--accent)}
       /* 새 그룹 만들기 카드 (A안) — 그룹 카드와 같은 크기의 큰 틸 카드, 그룹 목록 마지막에 둔다. 라벨만 있고 부연 설명은 없다 */
@@ -558,6 +552,8 @@
       #storeModal,#renameModal,#memberModal,#partAddModal,#groupAddModal{z-index:110}
       #menuModal{z-index:125}
       #storePickModal{z-index:135}
+      /* 삭제 확인 팝업은 이름 바꾸기 팝업(110) 위, 어떤 팝업보다도 위에 뜬다 */
+      #deleteConfirmModal{z-index:140}
       /* 주문 생성하기 — 가게 선택 커스텀 드롭다운: 네이티브 select 대신 앱 디자인
          (둥근 모서리·틸 체크)으로 직접 그리고, 목록이 길면 패널 안에서 스크롤한다 */
       .store-dd{position:relative}
@@ -1102,7 +1098,24 @@
           <button class="btn ghost" id="renameCancelBtn" type="button">취소</button>
         </div>
         <div class="delzone">
-          <button class="btn danger" id="renameDeleteBtn" type="button">파트 삭제</button>
+          <button class="deltext" id="renameDeleteBtn" type="button">파트 삭제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 삭제 확인 팝업: 이름 바꾸기 팝업의 작은 삭제 글자를 누르면 한 번 더 묻는다.
+         ‘삭제’를 눌러야 실제로 지워지고, ‘취소’·닫기·뒤로 가기는 이름 바꾸기 팝업으로 돌아간다 -->
+    <div class="modal hidden" id="deleteConfirmModal" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+      <div class="modal-backdrop" id="deleteConfirmBackdrop"></div>
+      <div class="modal-sheet">
+        <div class="modal-head">
+          <h3 id="deleteConfirmTitle">정말 삭제하시겠습니까?</h3>
+          <button class="modal-close" id="deleteConfirmCloseBtn" type="button" aria-label="팝업 닫기">×</button>
+        </div>
+        <p class="delconfirm-body" id="deleteConfirmBody"></p>
+        <div class="btnrow mt">
+          <button class="btn danger" id="deleteConfirmOkBtn" type="button">삭제</button>
+          <button class="btn ghost" id="deleteConfirmCancelBtn" type="button">취소</button>
         </div>
       </div>
     </div>
@@ -1801,6 +1814,7 @@ function _closeModalById(id, fromPop){
   else if (id === "partAddModal") closePartAddModal(fromPop);
   else if (id === "groupAddModal") closeGroupAddModal(fromPop);
   else if (id === "renameModal") closeRenameModal(fromPop);
+  else if (id === "deleteConfirmModal") closeDeleteConfirmModal(fromPop);
   else if (id === "gongchaModal") closeGongchaModal(fromPop);
   else if (id === "sizeModal") closeSizeModal(fromPop);
   else if (id === "storePickModal") applyStorePick(fromPop);
@@ -2444,6 +2458,64 @@ function ocDecodeText(raw){
 var ocBaseline = null, ocLastMts = 0, ocStateLoaded = false;
 var ocLastRemoteApplyAt = 0; /* 마지막으로 원격 델타·스냅샷을 반영한 시각 — 주문 생성 화면의 명단 고정이 동기화가 조용해질 때까지 기다리는 기준 */
 var lastCheckpointAt = 0, snapDirty = false, ocPendingDeltas = [], ocRetryingPending = false;
+/* ---------- 로컬 캐시 (새로고침 개선 1번) ----------
+   마지막으로 복호·병합이 끝난 상태를 기기 로컬에 저장해 두고, 다음에 켜면 브로커 연결을
+   기다리지 않고 캐시부터 그린다. 브로커 상태는 연결 뒤에 기존 병합 경로로 합쳐진다.
+   캐시는 ‘표시 전용 출발점’일 뿐 공유 상태가 아니다: ocStateLoaded는 캐시로 세우지 않고,
+   브로커 상태를 이번 실행에서 한 번이라도 받기 전(ocBrokerSynced)에는 캐시를 스냅샷·심기로
+   내보내지 않는다(publishSync·publishSeed의 가드). 발행 diff의 기준본도 캐시 상태로 세워
+   두므로 캐시 내용이 델타로 재발행되는 일도 없다. 빈 상태(기본값뿐)는 캐시로 저장하지
+   않는다 — 빈 캐시가 다음 부팅을 빈 화면으로 만들지 않게 하기 위해서다 */
+var OC_CACHE_PREFIX = "oc-state-cache-v1:";
+var ocFromCache = false, ocBrokerSynced = false, ocCacheSaveTimer = null;
+function ocCacheKey(){ return OC_CACHE_PREFIX + String(FIXED_ROOM || ""); }
+function ocSaveCache(){
+  try {
+    if (!window.localStorage) return;
+    if (!hasMeaningfulState(state)) return;
+    var payload = JSON.stringify({ v:1, room:String(FIXED_ROOM || ""), savedAt:Date.now(), state:state });
+    if (payload.length > 4 * 1024 * 1024) return;
+    localStorage.setItem(ocCacheKey(), payload);
+  } catch(e){}
+}
+function ocSaveCacheSoon(){
+  if (ocCacheSaveTimer) return;
+  ocCacheSaveTimer = setTimeout(function(){ ocCacheSaveTimer = null; ocSaveCache(); }, 400);
+}
+function ocLoadCache(){
+  try {
+    if (!window.localStorage) return false;
+    var raw = localStorage.getItem(ocCacheKey());
+    if (!raw) return false;
+    var data = JSON.parse(raw);
+    if (!data || data.v !== 1 || data.room !== String(FIXED_ROOM || "") || !data.state) return false;
+    if (!hasMeaningfulState(data.state)) return false;
+    state = normalizeState(data.state);
+    rebuildPartDefs(state.roster);
+    ocScanMts(state);
+    ocBaseline = ocBuildBaseline(state);
+    ocFromCache = true;
+    return true;
+  } catch(e){ return false; }
+}
+/* ---------- 첫 진입 단계화 (새로고침 개선 2번) ----------
+   첫 연결에서는 스냅샷을 먼저 반영해 그리고, 그 사이 도착한 델타는 복호만 해 모아 뒀다가
+   스냅샷 반영 직후 한 번에 적용한다. 델타는 mts 멱등이라 스냅샷에 이미 포함된 델타는
+   적용 단계에서 자동으로 걸러지고, 모아 둔 델타들의 렌더는 ocScheduleDeltaRender가
+   한 번으로 합친다. 스냅샷이 끝내 안 오면(델타만으로 복원하는 경우) 첫 델타 뒤 5초,
+   또는 연결 뒤 6초에 모아 둔 것을 그대로 적용한다 */
+var ocInitialLoad = true, ocInitialDeltaQueue = [], ocInitialFlushTimer = null;
+function ocQueueInitialDelta(col, id, msg){
+  ocInitialDeltaQueue.push({ col:col, id:id, msg:msg });
+  if (!ocInitialFlushTimer) ocInitialFlushTimer = setTimeout(ocFlushInitialDeltas, 5000);
+}
+function ocFlushInitialDeltas(){
+  if (ocInitialFlushTimer){ clearTimeout(ocInitialFlushTimer); ocInitialFlushTimer = null; }
+  if (!ocInitialLoad) return;
+  ocInitialLoad = false;
+  var q = ocInitialDeltaQueue; ocInitialDeltaQueue = [];
+  q.forEach(function(p){ ocApplyDelta(p.col, p.id, p.msg); });
+}
 var OC_COLS = ["stores", "menus", "channels", "orders", "meta"];
 function ocClone(o){ try { return JSON.parse(JSON.stringify(o)); } catch(e){ return o; } }
 function ocNextMts(){ var n = Date.now(); ocLastMts = Math.max(n, ocLastMts + 1); return ocLastMts; }
@@ -2653,8 +2725,15 @@ function publishSync(forceSnap){
       return;
     }
     if (wantSnap && plain !== lastSent){
+      if (ocFromCache && !ocBrokerSynced){
+        /* 캐시로 그린 상태는 브로커 상태를 한 번이라도 받기 전에는 스냅샷으로 내보내지
+           않는다 — 캐시를 새 상태인 양 발행하면 빈 기기 전송 금지 규칙을 우회하게 된다.
+           로컬에서 실제로 바꾼 항목의 델타는 위에서 이미 나갔고, 스냅샷 체크포인트는
+           브로커 확인 뒤로 미룬다 */
+        snapDirty = true;
+      }
       /* delta 모드에서 빈 기기가 체크포인트로 기존 데이터를 덮는 일은 없다 */
-      if (!(mode === "delta" && !meaningful && !ocStateLoaded)) await ocPublishSnapshotPlain(plain);
+      else if (!(mode === "delta" && !meaningful && !ocStateLoaded)) await ocPublishSnapshotPlain(plain);
     } else if (plain !== lastSent) snapDirty = true;
     ocRebuildBaseline();
   })();
@@ -2882,6 +2961,8 @@ function ocApplyDelta(col, id, msg){
   } finally { applyingRemote = false; }
   if (changed){
     ocStateLoaded = true;
+    ocBrokerSynced = true; /* 이번 실행에서 브로커 상태를 실제로 받았다 — 캐시 발행 가드 해제 기준 */
+    ocSaveCacheSoon(); /* 복호·반영이 끝난 최신 상태를 로컬 캐시에 남긴다 */
     ocLastRemoteApplyAt = Date.now();
     syncLegacyMirror();
     ocScheduleDeltaRender();
@@ -2901,6 +2982,9 @@ function handleDeltaPayload(topic, raw, prefix){
     if (!plain) return;
     var msg = null;
     try { msg = JSON.parse(plain); } catch(e){ return; }
+    /* 첫 진입 구간에서는 델타를 바로 적용하지 않고 모아 둔다 — 스냅샷이 먼저 반영·렌더된
+       뒤 ocFlushInitialDeltas가 한 번에 적용한다 (새로고침 개선 2번) */
+    if (ocInitialLoad){ ocQueueInitialDelta(col, id, msg); return; }
     ocApplyDelta(col, id, msg);
   });
 }
@@ -2910,6 +2994,7 @@ function touch(){
   syncLegacyMirror();
   if (!ui.draftDirty) ui.draft = null;
   renderAll();
+  ocSaveCacheSoon(); /* 로컬 변경도 캐시에 남겨 새로고침하면 방금 상태부터 보이게 한다 */
   clearTimeout(publishDeb); publishDeb = setTimeout(publishState, 200);
 }
 /* 상태에 ‘실제로 공유할 내용’이 있는지 본다. 부팅 직후 기본값(기본 가게 5곳·기본 명단·
@@ -2959,6 +3044,7 @@ function hasMeaningfulState(s){
    내보내, 전용 브로커가 비어 있어도 델타만으로 전체 복원이 되게 하고 기준본을 세운다 */
 function publishSeed(){
   if (!mqttClient || !mqttTopic || brokerMode !== "primary") return;
+  if (ocFromCache && !ocBrokerSynced) return; /* 캐시만으로는 심지 않는다 — 캐시를 새 상태인 양 발행하지 않기 위해서다. 백업 보관본을 받아 병합한 뒤(ocBrokerSynced)에는 이관 심기가 그대로 동작한다 */
   if (!state.version) state.version = Date.now();
   (async function(){
     if (ocKeyPromise){ try { await ocKeyPromise; } catch(e){} }
@@ -3164,6 +3250,9 @@ function startBrokerClient(kind){
     /* 연결이 안정된 뒤 한 번 발행을 시도한다 — 끊겨 있던 동안 쌓인 변경(기준본과의 diff)과
        시작 체크포인트를 내보내는 자리다 */
     setTimeout(function(){ if (mqttClient === client) publishSync(false); }, 3800);
+    /* 첫 진입 단계화의 안전장치: 스냅샷이 끝내 안 오면 연결 뒤 6초에 모아 둔 델타를
+       그대로 적용한다. 스냅샷이 먼저 왔으면 이미 비워져 있어 아무 일도 안 한다 */
+    setTimeout(function(){ ocFlushInitialDeltas(); }, 6000);
   });
   client.on("message", function(topic, message){
     if (mqttClient !== client) return;
@@ -3378,6 +3467,7 @@ function applyRemoteState(raw){
     if (!data || !data.state || typeof data.version !== "number") return;
     lastRemoteApplied = plain;
     ocStateLoaded = true;
+    ocBrokerSynced = true; /* 이번 실행에서 브로커 스냅샷을 실제로 받았다 — 캐시 발행 가드 해제 기준 */
     ocScanMts(data.state);
     /* 델타로 받은 최신 수정(mts가 스냅샷 version보다 큰 항목)은 낡은 스냅샷이 덮지 못하게
        병합 전에 따로 챙겨 뒀다가 병합 결과 위에 다시 얹는다 */
@@ -3407,6 +3497,8 @@ function applyRemoteState(raw){
       if (mergedFp !== remoteFp) scheduleRepublish(); /* 내 쪽에만 있던 주문을 상대에게도 전한다 */
       ocRetryPending();
       schedulePruneExpiredChannels(); /* 동기화로 받은 주문도 7일이 지났으면 정리한다 */
+      ocSaveCacheSoon(); /* 병합이 끝난 상태가 곧 캐시의 최신본이다 */
+      ocFlushInitialDeltas(); /* 스냅샷이 먼저 그려졌으니 모아 둔 델타를 이제 한 번에 적용한다 */
       return;
     }
     applyingRemote = true;
@@ -3417,6 +3509,8 @@ function applyRemoteState(raw){
     renderAll();
     ocRetryPending();
     schedulePruneExpiredChannels(); /* 동기화로 받은 주문도 7일이 지났으면 정리한다 */
+    ocSaveCacheSoon(); /* 병합이 끝난 상태가 곧 캐시의 최신본이다 */
+    ocFlushInitialDeltas(); /* 스냅샷이 먼저 그려졌으니 모아 둔 델타를 이제 한 번에 적용한다 */
     if (mergedFp !== remoteFp) scheduleRepublish();
   });
 }
@@ -3451,6 +3545,7 @@ document.addEventListener("visibilitychange", function(){ if (!document.hidden) 
    발행되지 않은 채 페이지와 함께 사라졌다 (파트 이름 바꾸기가 되돌아간 원인 중 하나).
    디바운스가 걸려 있으면 기다리지 않고 바로 체크포인트 발행으로 넘긴다 */
 function flushPendingPublish(){
+  ocSaveCache(); /* 페이지가 내려가기 전에 최신 상태를 캐시에 동기 저장한다 (발행이 아니라 표시 전용 캐시라 안전하다) */
   if (publishDeb){ clearTimeout(publishDeb); publishDeb = null; publishSync(true); return; }
   if (ocSyncMode() === "delta" && snapDirty && hasMeaningfulState(state)) publishSync(true);
 }
@@ -5383,8 +5478,45 @@ function deleteFromRenameModal(){
     toast("그룹 ‘" + name + "’을 지웠어요. 그 아래 파트와 인원은 ‘그룹 없는 파트’에 그대로 남아 있어요.");
   }
 }
+/* ---------- 삭제 확인 팝업 — 작은 삭제 글자를 누르면 바로 지우지 않고 한 번 더 묻는다.
+   ‘삭제’를 눌러야 deleteFromRenameModal이 실제로 지우고, ‘취소’·닫기·뒤로 가기는
+   이름 바꾸기 팝업으로 그대로 돌아간다 (renameTarget은 건드리지 않는다) ---------- */
+function openDeleteConfirmModal(){
+  var t = ui.renameTarget; if (!t) return;
+  var name = t.name, body;
+  if (t.kind === "leaf"){
+    var leafObj = t.scope ? (rosterLeafForScope(t.scope, name) || leafRoster(name)) : leafRoster(name);
+    var cnt = leafObj && leafObj.members ? leafObj.members.length : 0;
+    body = '파트 <span class="dc-name">‘' + esc(name) + '’</span>와 그 안의 인원 ' + cnt + '명을 지웁니다.'
+      + '<span class="dc-note">이미 열린 채널의 명단은 그대로 유지돼요.</span>';
+  } else {
+    var grp = groupRoster(name);
+    var partCnt = grp && grp.children ? grp.children.length : 0;
+    var gdef = partDef(name);
+    var memCnt = gdef && gdef.members ? gdef.members.length : 0;
+    body = '그룹 <span class="dc-name">‘' + esc(name) + '’</span>을 지웁니다. 하위 파트 ' + partCnt + '개 · 인원 ' + memCnt + '명이에요.'
+      + '<span class="dc-note">파트와 인원은 지워지지 않고 ‘그룹 없는 파트’로 그대로 남아 있어요. 이미 열린 채널의 명단은 그대로 유지돼요.</span>';
+  }
+  $("deleteConfirmBody").innerHTML = body;
+  var modal = $("deleteConfirmModal"); if (!modal) return;
+  modal.classList.remove("hidden");
+  _trackModalOpen("deleteConfirmModal");
+}
+function closeDeleteConfirmModal(fromPop){
+  var modal = $("deleteConfirmModal"); if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  _trackModalClose("deleteConfirmModal", fromPop);
+}
+function confirmDeleteFromModal(){
+  closeDeleteConfirmModal();
+  deleteFromRenameModal();
+}
 $("renameSaveBtn").addEventListener("click", saveRenameFromModal);
-$("renameDeleteBtn").addEventListener("click", deleteFromRenameModal);
+$("renameDeleteBtn").addEventListener("click", openDeleteConfirmModal);
+$("deleteConfirmOkBtn").addEventListener("click", confirmDeleteFromModal);
+$("deleteConfirmCancelBtn").addEventListener("click", function(){ closeDeleteConfirmModal(); });
+$("deleteConfirmCloseBtn").addEventListener("click", function(){ closeDeleteConfirmModal(); });
+$("deleteConfirmBackdrop").addEventListener("click", function(){ closeDeleteConfirmModal(); });
 $("renameCancelBtn").addEventListener("click", function(){ closeRenameModal(); });
 $("renameModalCloseBtn").addEventListener("click", function(){ closeRenameModal(); });
 $("renameModalBackdrop").addEventListener("click", function(){ closeRenameModal(); });
@@ -6430,7 +6562,9 @@ $("clearOrdersBtn").addEventListener("click", function(){
 });
 
 syncPriceFields();
+ocLoadCache(); /* 마지막으로 복호한 상태가 로컬에 있으면 기본값 대신 캐시부터 그린다 — 브로커 상태는 연결 뒤에 병합된다 (새로고침 개선 1번) */
 mergeBuiltinStores(state); /* 첫 화면부터 기본 가게가 보이게 (공유 데이터가 도착하면 normalizeState가 다시 병합) */
+if (ocFromCache) ocRebuildBaseline(); /* 캐시+기본 가게 병합까지 끝난 상태를 발행 기준본으로 삼아 캐시 내용이 델타로 재발행되지 않게 한다 */
 ui.urlChannelId = channelIdFromUrl();
 ui.channelId = ui.urlChannelId || ui.channelId;
 if (ui.channelId) ui.lastLinkChannelId = ui.channelId;
