@@ -2625,6 +2625,12 @@ function ocLoadCache(){
     if (!raw) return false;
     var data = JSON.parse(raw);
     if (!data || data.v !== 1 || data.room !== String(FIXED_ROOM || "") || !data.state) return false;
+    /* 오래된 캐시(12시간 초과)는 출발점으로 쓰지 않는다 — 며칠씩 안 쓰던 PC가
+       옛 명단·옛 가게 목록을 ‘현재 상태’인 양 들고 시작하면, 그 캐시에 찍힌
+       version·metaMts가 최신 공유 데이터와의 병합·델타 판정을 계속 이겨
+       새 그룹(Media2)·새 가게가 영원히 안 보이는 상태로 굳을 수 있다.
+       캐시는 ‘방금 쓰던 기기’의 첫 화면용일 뿐, 오래됐으면 버리고 동기화로 받는다 */
+    if (typeof data.savedAt === "number" && Date.now() - data.savedAt > 12 * 60 * 60 * 1000) return false;
     if (!hasMeaningfulState(data.state)) return false;
     state = normalizeState(data.state);
     rebuildPartDefs(state.roster);
@@ -3131,14 +3137,28 @@ function ocApplyDelta(col, id, msg){
       changed = ocRemoveEntity(state, col, id, msg.mts);
       if (ocBaseline && ocBaseline[col]) delete ocBaseline[col][id];
     } else if (msg.ent){
-      if (cur && (cur.mts || 0) >= msg.mts) return false;
+      var metaGain = false, metaKeepMts = 0;
+      if (cur && (cur.mts || 0) >= msg.mts){
+        /* 명단(meta)만은 예외: 로컬 metaMts가 부풀려진 기기(오래된 캐시를 들고
+           발행 때 mts를 새로 찍은 PC 등)에서는 정당한 명단 델타가 mts 판정에
+           영원히 걸려 새 그룹이 안 보였다. 들어온 명단이 지금 명단보다
+           그룹·파트·인원을 하나도 잃지 않는 ‘순수 추가’일 때만 mts를 넘어
+           받아들인다 — 삭제·축소 델타는 기존처럼 mts 판정을 그대로 탄다 */
+        if (col !== "meta") return false;
+        try {
+          var incRoster = sanitizeRoster(msg.ent.roster), curRoster = sanitizeRoster(state.roster);
+          if (JSON.stringify(incRoster) === JSON.stringify(curRoster) || ocRosterLoss(incRoster, curRoster)) return false;
+        } catch(e){ return false; }
+        metaGain = true; metaKeepMts = cur.mts || 0;
+      }
       if (!ocPlaceEntity(state, col, id, msg.ent, msg.mts)){ ocPendingDeltas.push({ col:col, id:id, msg:msg }); return false; }
+      if (metaGain) state.metaMts = Math.max(state.metaMts || 0, metaKeepMts); /* mts는 낮추지 않는다 — 이후 델타 판정 기준 유지 */
       changed = true;
       if (ocBaseline){
         if (!ocBaseline[col]) ocBaseline[col] = {};
         var placed = ocFindEnt(state, col, id);
         if (placed) ocBaseline[col][id] = ocStripJson(placed);
-        if (col === "meta") ocBaselineMetaMts = msg.mts;
+        if (col === "meta") ocBaselineMetaMts = Math.max(ocBaselineMetaMts || 0, state.metaMts || 0, msg.mts);
       }
     }
   } finally { applyingRemote = false; }
@@ -3469,6 +3489,66 @@ function mergeChannelEntries(baseCh, otherCh, preferBase){
     orderTombs: tombsO, skipTombs: tombsS, ordersClearedAt: clearedO, skipsClearedAt: clearedS
   };
 }
+/* 가게 목록 병합: 채널·주문처럼 id 기준 합집합으로 합친다. 예전에는 가게가
+   뼈대(버전이 최신인 쪽)에 통째로 딸려 가서, 체크포인트 스냅샷에 아직 안 들어간
+   가게(델타로만 존재하는 팝업스토어 가게 등)가 버전 높은 스냅샷과의 병합에서
+   통째로 떨어졌다. 델타는 한 번 적용되면 다시 배달되지 않으므로, 떨어진 가게는
+   그 기기에서 새로고침해도 되돌아오지 않고 ‘PC에서만 가게가 안 보이는’ 상태가
+   굳었다. 메뉴도 id(없으면 이름+카테고리) 기준 합집합, 항목별 승자는 mts가
+   큰 쪽, 동률이면 preferRemote 쪽이다. 지운 기본 가게(removedBuiltins 양쪽
+   합집합에 있는 id)는 되살리지 않는다 */
+function mergeStoreLists(L, R, preferRemote, removedBuiltins){
+  var removed = {};
+  (removedBuiltins || []).forEach(function(x){ removed[x] = 1; });
+  function indexById(list){
+    var map = {};
+    (Array.isArray(list) ? list : []).forEach(function(st){ if (st && st.id != null) map[String(st.id)] = st; });
+    return map;
+  }
+  var lm = indexById(L), rm = indexById(R), out = [], done = {};
+  function mergedMenus(a, b){
+    if (!a) return (b && b.menus) || [];
+    if (!b) return a.menus || [];
+    var pref = preferRemote ? b : a, other = preferRemote ? a : b;
+    var byKey = {}, order = [];
+    function keyOf(m){ return m && m.id != null ? "id:" + String(m.id) : "nm:" + menuIdentityKey(m || {}); }
+    (other.menus || []).forEach(function(m){ if (!m) return; var k = keyOf(m); if (!byKey[k]){ byKey[k] = m; order.push(k); } });
+    (pref.menus || []).forEach(function(m){
+      if (!m) return; var k = keyOf(m), cur = byKey[k];
+      if (!cur){ byKey[k] = m; order.push(k); return; }
+      if ((m.mts || 0) >= (cur.mts || 0)) byKey[k] = m;
+    });
+    /* id가 달라도 (이름+카테고리)가 같은 메뉴는 하나로 합친다 — 세대 교체로
+       id만 바뀐 같은 메뉴가 두 개로 남지 않게 */
+    var seenIdent = {}, res = [];
+    order.forEach(function(k){
+      var m = byKey[k]; if (!m) return;
+      var ik = menuIdentityKey(m);
+      if (seenIdent[ik]){
+        var prev = res[seenIdent[ik] - 1];
+        if ((m.mts || 0) > (prev.mts || 0)) res[seenIdent[ik] - 1] = m;
+        return;
+      }
+      seenIdent[ik] = res.length + 1; res.push(m);
+    });
+    return res;
+  }
+  function pushStore(id){
+    if (done[id]) return; done[id] = 1;
+    if (removed[id]) return; /* 지운 기본 가게는 되살리지 않는다 */
+    var a = lm[id], b = rm[id];
+    if (!a && !b) return;
+    if (!a || !b){ out.push(a || b); return; }
+    var pref = preferRemote ? b : a, other = preferRemote ? a : b;
+    var skel = (other.mts || 0) > (pref.mts || 0) ? other : pref;
+    var merged = ocClone(skel); delete merged.menus;
+    merged.menus = mergedMenus(a, b);
+    out.push(merged);
+  }
+  (preferRemote ? R : L || []).forEach(function(st){ if (st && st.id != null) pushStore(String(st.id)); });
+  (preferRemote ? L : R || []).forEach(function(st){ if (st && st.id != null) pushStore(String(st.id)); });
+  return out;
+}
 /* 두 상태를 합친다: 뼈대는 버전이 최신인 쪽, 주문·Skip은 채널별 합집합.
    버전은 ‘보낸 기기 시계’라 기기마다 조금씩 다를 수 있지만, 주문은 어느 쪽이 뼈대가
    되든 합집합이라 시계 오차로 주문이 사라지지는 않는다 */
@@ -3492,6 +3572,16 @@ function mergeStatesOrders(localRaw, remoteRaw){
     else if (ocRosterLoss(R.roster, L.roster, true)) rosterWin = R;
   }
   base.roster = rosterWin.roster;
+  /* 삭제 기록은 양쪽 합집합으로 유지한다 (한쪽에만 남은 삭제 기록이 병합에서
+     빠져 지운 가게·메뉴·채널이 되살아나는 일을 막는다) */
+  ["removedBuiltins", "removedBuiltinMenus", "removedChannels"].forEach(function(k){
+    var uni = [];
+    [L, R].forEach(function(s){ (Array.isArray(s[k]) ? s[k] : []).forEach(function(x){ if (uni.indexOf(x) < 0) uni.push(x); }); });
+    base[k] = uni;
+  });
+  /* 가게·메뉴는 뼈대 승자만 따르면 델타로만 존재하던 가게가 병합에서 떨어져
+     그 기기에 영원히 안 보이게 되므로, 채널처럼 합집합으로 합친다 */
+  base.stores = mergeStoreLists(L.stores, R.stores, preferRemote, base.removedBuiltins);
   var otherById = {};
   other.channels.forEach(function(c){ otherById[c.id] = c; });
   var seen = {};
@@ -4029,7 +4119,20 @@ function syncStartSnapBeforeRender(){
     if (typeof ocStateLoaded !== "undefined" && ocStateLoaded) scheduleStartSnapFreeze();
     return;
   }
-  if (ui.startSnapFrozen) return;
+  if (ui.startSnapFrozen){
+    /* 고정된 화면이라도 아직 인원을 하나도 고르지 않았고 추가 인원도 없으면
+       라이브 명단을 따라간다 — 주문 생성 화면을 오래 열어 둔 PC 탭이 옛 명단
+       (새 그룹이 없던 시절)에 영원히 머물러 Media2 같은 그룹이 안 보이던
+       문제를 막기 위해서다. 선택이 시작된 뒤에는 기존 규칙대로 고정을 지켜,
+       고르는 도중에 카드가 바뀌지 않게 한다 */
+    var idle = !(ui.newSel && ui.newSel.length) && !(ui.newCustom && ui.newCustom.length)
+      && !(ui.newCustomSel && ui.newCustomSel.length);
+    if (!idle) return;
+    var frozenLiveJson = "";
+    try { frozenLiveJson = JSON.stringify(sanitizeRoster(state.roster)); } catch(e){}
+    if (frozenLiveJson && frozenLiveJson !== ui.startSnapJson) captureStartSnap();
+    return;
+  }
   var liveJson = "";
   try { liveJson = JSON.stringify(sanitizeRoster(state.roster)); } catch(e){}
   if (liveJson && liveJson !== ui.startSnapJson){
