@@ -1380,27 +1380,48 @@ function computeBlocks(parts, ctx){
   pushBlock("개별 추가", extras);
   return out;
 }
-/* parts+absent 로 실제 주문 명단을 만든다 (자리 비움 제외) */
+/* 동명이인 구분 목록(ctx.people)으로 명단 블록을 만든다 — 이름이 같아도 지우지 않고
+   한 명 한 명 그대로 넣고, 각 자리의 고유 키를 keys에 나란히 실어 주문·Skip을
+   이름이 아니라 키로 구분할 수 있게 한다. 파트가 바뀌는 지점에서 블록을 나눈다 */
+function peopleBlocks(people, absent){
+  absent = absent || [];
+  var out = [], cur = null;
+  (Array.isArray(people) ? people : []).forEach(function(p){
+    if (!p || typeof p.name !== "string" || !p.name) return;
+    if (absent.indexOf(p.name) >= 0) return;
+    if (!cur || cur.part !== (p.part || "")){ cur = { part: p.part || "", members: [], keys: [] }; out.push(cur); }
+    cur.members.push(p.name); cur.keys.push(p.key || "");
+  });
+  return out;
+}
+/* parts+absent 로 실제 주문 명단을 만든다 (자리 비움 제외).
+   채널에 동명이인 구분 목록(people)이 있으면 그쪽이 우선이다 — 이름 기준인
+   memberMap·extraMembers로 만들면 동명이인이 한 명으로 합쳐지기 때문이다 */
 function rosterFor(parts, absent, ctx){
   absent = absent || [];
+  if (ctx && Array.isArray(ctx.people) && ctx.people.length) return peopleBlocks(ctx.people, absent);
   return computeBlocks(parts, ctx).map(function(b){
     return { part: b.part, members: b.members.filter(function(n){ return absent.indexOf(n) < 0; }) };
   });
 }
 function rosterFlat(parts, absent, ctx){
   var flat = [];
-  rosterFor(parts, absent, ctx).forEach(function(b){ b.members.forEach(function(n){ flat.push({ name:n, part:b.part }); }); });
+  rosterFor(parts, absent, ctx).forEach(function(b){ b.members.forEach(function(n, i){ flat.push({ name:n, part:b.part, key: (b.keys ? b.keys[i] : "") || "" }); }); });
   return flat;
 }
 function absentInParts(parts, absent, ctx){
   var out = [];
+  if (ctx && Array.isArray(ctx.people) && ctx.people.length){
+    ctx.people.forEach(function(p){ if (p && p.name && absent.indexOf(p.name) >= 0) out.push({ name:p.name, part:p.part || "", key:p.key || "" }); });
+    return out;
+  }
   computeBlocks(parts, ctx).forEach(function(b){
     b.members.forEach(function(n){ if (absent.indexOf(n) >= 0) out.push({ name:n, part:b.part }); });
   });
   return out;
 }
-function chCtx(c){ return { memberMap: (c && c.memberMap) || null, groupExtras: (c && c.groupExtras) || null, extras: (c && c.extraMembers) || [] }; }
-function draftCtx(d){ return { memberMap: (d && d.memberMap) || null, groupExtras: (d && d.groupExtras) || null, extras: (d && d.extras) || [] }; }
+function chCtx(c){ return { memberMap: (c && c.memberMap) || null, groupExtras: (c && c.groupExtras) || null, extras: (c && c.extraMembers) || [], people: (c && c.people) || null }; }
+function draftCtx(d){ return { memberMap: (d && d.memberMap) || null, groupExtras: (d && d.groupExtras) || null, extras: (d && d.extras) || [], people: (d && d.people) || null }; }
 function cloneMemberMap(m){
   if (!m || typeof m !== "object") return null;
   var out = {};
@@ -1769,7 +1790,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", orderTab:"order", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", orderTab:"order", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -1844,7 +1865,7 @@ function closePartsModal(fromPop){
 function defaultChannel(id){
   return { id: id || "channel-main", title:"검증1", storeId:null, parts:["검증1"], absent:[], limits:{ cats:{}, maxPrice:null }, orders:[], skips:[],
            orderTombs:{}, skipTombs:{}, ordersClearedAt:0, skipsClearedAt:0,
-           memberMap:null, groupExtras:null, extraMembers:[], createdAt:0 /* 주문(채널) 생성 시각(ms) — 0이면 모름. 7일 자동 만료의 기준이라 새로 만들 때 반드시 찍는다 */ };
+           memberMap:null, groupExtras:null, extraMembers:[], people:null, createdAt:0 /* 주문(채널) 생성 시각(ms) — 0이면 모름. 7일 자동 만료의 기준이라 새로 만들 때 반드시 찍는다 */ };
 }
 function cleanMemberMap(raw){
   if (!raw || typeof raw !== "object") return null;
@@ -1853,6 +1874,24 @@ function cleanMemberMap(raw){
     if (Array.isArray(raw[k])){ out[k] = raw[k].filter(function(n){ return typeof n === "string" && n; }); any = true; }
   });
   return any ? out : null;
+}
+/* 동명이인 구분용 인원 목록 — 채널을 만들 때 고른 사람 한 명 한 명이 고유 키(key)와
+   함께 들어 있다. 이름(name)이 같아도 키가 다르면 서로 다른 사람으로 취급한다.
+   이 목록이 있는 채널은 memberMap·extraMembers(이름 기준이라 동명이인이 합쳐진다) 대신
+   이 목록으로 명단을 만든다. 키가 겹치는 깨진 항목은 뒤에 번호를 붙여 살려 둔다 */
+function cleanPeople(raw){
+  if (!Array.isArray(raw)) return null;
+  var out = [], seen = {};
+  raw.forEach(function(p){
+    if (!p || typeof p !== "object") return;
+    var name = typeof p.name === "string" ? p.name.trim() : "";
+    var key = typeof p.key === "string" ? p.key : "";
+    if (!name || !key) return;
+    if (seen[key]) key = key + "#" + out.length;
+    seen[key] = 1;
+    out.push({ key:key, name:name, part: typeof p.part === "string" ? p.part : "" });
+  });
+  return out.length ? out : null;
 }
 /* 구버전 채널(명단 스냅샷이 없는 채널)은 지금 명단으로 스냅샷을 만들어 고정한다 —
    이후 ‘파트 관리’에서 명단을 바꿔도 이미 열린 채널의 인원은 그대로 유지된다 */
@@ -1892,6 +1931,7 @@ function sanitizeChannel(raw, fallbackId){
   c.memberMap = cleanMemberMap(raw.memberMap);
   c.groupExtras = cleanMemberMap(raw.groupExtras);
   c.extraMembers = Array.isArray(raw.extraMembers) ? raw.extraMembers.filter(function(n){ return typeof n === "string" && n; }) : [];
+  c.people = cleanPeople(raw.people);
   if (!c.memberMap) fillChannelSnapshot(c);
   c.orders = Array.isArray(raw.orders) ? raw.orders : [];
   c.skips = Array.isArray(raw.skips) ? raw.skips : [];
@@ -2033,6 +2073,22 @@ function dropSkipsByName(c, name){
   if (!c.skipTombs) c.skipTombs = {};
   tombList(c.skipTombs, (c.skips || []).filter(function(s){ return s.name === name; }));
   c.skips = (c.skips || []).filter(function(s){ return s.name !== name; });
+}
+/* 키가 있는 사람(동명이인 구분 대상)은 자기 항목만 지운다 — 이름으로 지우면
+   같은 이름 다른 사람의 주문·Skip까지 함께 사라진다. 키가 없으면 기존 이름 기준 */
+function dropOrdersByPerson(c, name, key){
+  if (!c) return;
+  if (!key){ dropOrdersByName(c, name); return; }
+  if (!c.orderTombs) c.orderTombs = {};
+  tombList(c.orderTombs, (c.orders || []).filter(function(o){ return o.pkey === key; }));
+  c.orders = (c.orders || []).filter(function(o){ return o.pkey !== key; });
+}
+function dropSkipsByPerson(c, name, key){
+  if (!c) return;
+  if (!key){ dropSkipsByName(c, name); return; }
+  if (!c.skipTombs) c.skipTombs = {};
+  tombList(c.skipTombs, (c.skips || []).filter(function(s){ return s.pkey === key; }));
+  c.skips = (c.skips || []).filter(function(s){ return s.pkey !== key; });
 }
 /* 채널의 주문·Skip을 전부 비울 때는 건별 기록 대신 ‘초기화 시각’을 남긴다 —
    그 시각 이전에 만들어진 주문은 어느 스냅샷에서 오든 병합 때 버려진다 */
@@ -2292,8 +2348,30 @@ function personStatus(name){
   if (skipOf(name)) return "skip";
   return "pending";
 }
+/* 동명이인 구분 — 주문·Skip 항목의 주인 키. 제출할 때 고른 사람의 키(pkey)가 실려 있으면
+   그 키가 주인이고, 없는(구버전) 항목은 이름이 주인이다. 동기화 병합의 ‘한 사람 항목은
+   하나’ 규칙도 이 키로 판단해야 동명이인의 항목이 서로를 지우지 않는다 */
+function entryPersonKey(o){ return (o && o.pkey) ? ("k:" + o.pkey) : ("n:" + ((o && o.name) || "")); }
+function orderOfKey(key){ if (!key) return null; for (var i=0;i<activeChannel().orders.length;i++) if (activeChannel().orders[i].pkey===key) return activeChannel().orders[i]; return null; }
+function skipOfKey(key){ if (!key) return null; for (var i=0;i<activeChannel().skips.length;i++) if (activeChannel().skips[i].pkey===key) return activeChannel().skips[i]; return null; }
+/* 사람 한 명의 상태 — 키가 있는 사람은 키로만 판단한다(같은 이름 다른 사람의 주문이
+   ‘주문 완료’로 새지 않게). 단, 키가 실리지 않은 구버전 항목은 이름으로 판단한다 */
+function personStatusP(p){
+  if (!p) return "pending";
+  if (p.key){
+    if (orderOfKey(p.key)) return "ordered";
+    if (skipOfKey(p.key)) return "skip";
+    var legacyO = false, legacyS = false;
+    activeChannel().orders.forEach(function(o){ if (!o.pkey && o.name === p.name) legacyO = true; });
+    if (legacyO) return "ordered";
+    activeChannel().skips.forEach(function(s){ if (!s.pkey && s.name === p.name) legacyS = true; });
+    if (legacyS) return "skip";
+    return "pending";
+  }
+  return personStatus(p.name);
+}
 function pendingList(){
-  return rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel())).filter(function(p){ return personStatus(p.name)==="pending"; });
+  return rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel())).filter(function(p){ return personStatusP(p)==="pending"; });
 }
 
 /* ---------- sync (Firebase Firestore, 공유 채널 — 링크만으로 공유) ---------- */
@@ -2926,9 +3004,11 @@ function ocPlaceEntity(s, col, id, ent, mts){
     var clearedAt = isSkip ? (ch.skipsClearedAt || 0) : (ch.ordersClearedAt || 0);
     if (clearedAt && (typeof ent.ts === "number" ? ent.ts : 0) <= clearedAt) return true;
     var entry = ocClone(ent); delete entry.channelId; delete entry.kind; entry.mts = mts;
-    /* 채널당 한 사람 항목은 하나 — 같은 이름의 옛 항목(다른 id)은 최근 것만 남긴다 */
+    /* 채널당 한 사람 항목은 하나 — 같은 사람의 옛 항목(다른 id)은 최근 것만 남긴다.
+       ‘같은 사람’ 판단은 이름이 아니라 주인 키(entryPersonKey)로 한다: 동명이인이
+       각자 제출하면 이름은 같아도 키가 달라 서로의 항목을 지우지 않는다 */
     for (i = list.length - 1; i >= 0; i--){
-      if (list[i] && list[i].name === entry.name && String(list[i].id) !== id && (typeof list[i].ts === "number" ? list[i].ts : 0) <= (typeof entry.ts === "number" ? entry.ts : 0)) list.splice(i, 1);
+      if (list[i] && entryPersonKey(list[i]) === entryPersonKey(entry) && String(list[i].id) !== id && (typeof list[i].ts === "number" ? list[i].ts : 0) <= (typeof entry.ts === "number" ? entry.ts : 0)) list.splice(i, 1);
     }
     for (i = 0; i < list.length; i++) if (String(list[i].id) === id){ list[i] = entry; return true; }
     list.push(entry);
@@ -3362,16 +3442,19 @@ function mergeEntryList(baseList, otherList, tombs, clearedAt, preferBase){
   }
   (baseList || []).forEach(function(o){ consider(o, false); });
   (otherList || []).forEach(function(o){ consider(o, true); });
-  /* 채널당 한 사람의 주문·Skip은 하나만 — 양쪽에 서로 다른 id로 남아 있으면 최근 것만 남긴다 */
-  var byName = {};
+  /* 채널당 한 사람의 주문·Skip은 하나만 — 양쪽에 서로 다른 id로 남아 있으면 최근 것만 남긴다.
+     ‘한 사람’ 판단은 이름이 아니라 주인 키(entryPersonKey)로 한다: 동명이인은 이름이
+     같아도 키가 달라 양쪽 항목이 모두 남는다 */
+  var byPerson = {};
   Object.keys(byKey).forEach(function(k){
     var cand = byKey[k], o = cand.o;
-    var cur = byName[o.name];
-    if (!cur){ byName[o.name] = cand; return; }
+    var pk = entryPersonKey(o);
+    var cur = byPerson[pk];
+    if (!cur){ byPerson[pk] = cand; return; }
     var ts = typeof o.ts === "number" ? o.ts : 0, curTs = typeof cur.o.ts === "number" ? cur.o.ts : 0;
-    if (ts > curTs || (ts === curTs && cand.other !== preferBase)) byName[o.name] = cand;
+    if (ts > curTs || (ts === curTs && cand.other !== preferBase)) byPerson[pk] = cand;
   });
-  var out = Object.keys(byName).map(function(k){ return byName[k].o; });
+  var out = Object.keys(byPerson).map(function(k){ return byPerson[k].o; });
   out.sort(function(a, b){ return (typeof a.ts === "number" ? a.ts : 0) - (typeof b.ts === "number" ? b.ts : 0); });
   return out;
 }
@@ -3999,7 +4082,26 @@ function leafPartOfName(n){
   for (var i = 0; i < leaves.length; i++) if (leaves[i].members.indexOf(n) >= 0) return leaves[i].name;
   return null;
 }
-/* 추가 인원의 선택 상태는 명단 선택(ui.newSel — 이름 기준)과 분리해 ‘그룹+이름’ 키로
+/* 명단 선택은 이름이 아니라 ‘자리 키’로 든다 — 같은 이름이 여러 파트에 있거나 한 파트에
+   두 번 있어도 각 자리가 따로 선택되고, 주문을 시작해도 서로 합쳐지지 않게 하기 위해서다.
+   키 = R|종류(leaf/gex)|그룹|파트|그 이름의 몇 번째 자리인지|이름 (각 조각은 인코딩한다).
+   주문 시작 때 만드는 채널의 인원 목록(people)에도 이 키를 그대로 실어, 주문 화면과
+   동기화 병합까지 같은 키로 한 사람을 가리킨다 */
+function rosterSelKey(group, part, name, occ, isGex){
+  return ["R", isGex ? "gex" : "leaf", encodeURIComponent(group || ""), encodeURIComponent(part || ""), String(occ || 0), encodeURIComponent(name || "")].join("|");
+}
+function entriesOfMembers(members, group, part, isGex){
+  var counts = {}, out = [];
+  (Array.isArray(members) ? members : []).forEach(function(n){
+    var occ = counts[n] || 0; counts[n] = occ + 1;
+    out.push({ name:n, key: rosterSelKey(group, part, n, occ, isGex) });
+  });
+  return out;
+}
+function leafEntriesFor(leaf, group){ return leaf ? entriesOfMembers(leaf.members, group, leaf.name, false) : []; }
+function groupExtraEntriesFor(gname){ return entriesOfMembers(snapGroupExtras(gname), gname, "", true); }
+function entryKeys(entries){ return entries.map(function(e){ return e.key; }); }
+/* 추가 인원의 선택 상태는 명단 선택(ui.newSel — 자리 키 기준)과 분리해 ‘그룹+이름’ 키로
    따로 든다(ui.newCustomSel). 동명이인을 추가 인원으로 넣어도 명단에 있는 같은 이름
    사람의 칩과 선택 상태가 공유되지 않게 하기 위해서다 */
 function customSelKey(g, n){ return (g || "") + "\u0001" + n; }
@@ -4008,22 +4110,22 @@ function customSelList(){
   return ui.newCustomSel;
 }
 function customIsSelected(g, n){ return customSelList().indexOf(customSelKey(g, n)) >= 0; }
-function scopeStateOf(names, customKeys){
-  var total = names.length + (customKeys ? customKeys.length : 0);
+function scopeStateOf(keys, customKeys){
+  var total = keys.length + (customKeys ? customKeys.length : 0);
   if (!total) return "none";
   var sel = 0;
-  names.forEach(function(n){ if (ui.newSel.indexOf(n) >= 0) sel++; });
+  keys.forEach(function(k){ if (ui.newSel.indexOf(k) >= 0) sel++; });
   if (customKeys) customKeys.forEach(function(k){ if (customSelList().indexOf(k) >= 0) sel++; });
   if (sel === 0) return "none";
   return sel === total ? "all" : "some";
 }
-function toggleScopeNames(names, customKeys){
+function toggleScopeNames(keys, customKeys){
   freezeStartSnapNow(); /* 인원 선택을 시작하면 그 시점 명단으로 고정한다 */
-  if (scopeStateOf(names, customKeys) === "all"){
-    ui.newSel = ui.newSel.filter(function(n){ return names.indexOf(n) < 0; });
+  if (scopeStateOf(keys, customKeys) === "all"){
+    ui.newSel = ui.newSel.filter(function(k){ return keys.indexOf(k) < 0; });
     if (customKeys && customKeys.length) ui.newCustomSel = customSelList().filter(function(k){ return customKeys.indexOf(k) < 0; });
   } else {
-    names.forEach(function(n){ if (ui.newSel.indexOf(n) < 0) ui.newSel.push(n); });
+    keys.forEach(function(k){ if (ui.newSel.indexOf(k) < 0) ui.newSel.push(k); });
     if (customKeys) customKeys.forEach(function(k){ if (customSelList().indexOf(k) < 0) ui.newCustomSel.push(k); });
   }
   renderOrderStart();
@@ -4077,10 +4179,10 @@ function renderOrderStart(){
      파트별 인원 수는 표시하지 않는다 (상단 전체 합계만) */
   var tree = $("newPartTree");
   if (tree){
-    function memberChipsHtml(members){
-      return '<div class="member-chips">' + members.map(function(n){
-        var on = ui.newSel.indexOf(n) >= 0;
-        return '<button type="button" class="member-chip" data-member="' + esc(n) + '" aria-pressed="' + on + '">' + esc(n) + "</button>";
+    function memberChipsHtml(entries){
+      return '<div class="member-chips">' + entries.map(function(e){
+        var on = ui.newSel.indexOf(e.key) >= 0;
+        return '<button type="button" class="member-chip" data-member="' + esc(e.name) + '" data-member-key="' + esc(e.key) + '" aria-pressed="' + on + '">' + esc(e.name) + "</button>";
       }).join("") + "</div>";
     }
     function extraCardHtml(groupName){
@@ -4100,21 +4202,22 @@ function renderOrderStart(){
         + '<button class="btn primary" data-extra-add data-extra-group="' + esc(g) + '" type="button">추가</button></div></div>';
     }
     function subpartHtml(p, groupName){
-      var st = scopeStateOf(p.members);
+      var entries = leafEntriesFor(p, groupName);
+      var st = scopeStateOf(entryKeys(entries));
       return '<div class="subpart"><button type="button" class="scope-head sub" data-scope-leaf="' + esc(p.name) + '" data-leaf-group="' + esc(groupName || "") + '" aria-pressed="' + (st === "all") + '">'
         + triCheckHtml(st) + '<span class="scope-name">' + esc(p.name) + "</span></button>"
-        + memberChipsHtml(p.members) + "</div>";
+        + memberChipsHtml(entries) + "</div>";
     }
     var S_LEAVES = snapLeafList(), S_GROUPS = snapGroupList();
     var html = S_GROUPS.map(function(g, gIdx){
-      var scopeNames = [], seen = {};
+      var scopeKeys = [];
       g.children.forEach(function(cn){
         var leaf = snapLeafFor(g.name, cn) || snapPartDef(cn);
-        if (leaf) leaf.members.forEach(function(n){ if (!seen[n]){ seen[n] = 1; scopeNames.push(n); } });
+        if (leaf) leafEntriesFor(leaf, g.name).forEach(function(e){ scopeKeys.push(e.key); });
       });
-      snapGroupExtras(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; scopeNames.push(n); } });
+      groupExtraEntriesFor(g.name).forEach(function(e){ scopeKeys.push(e.key); });
       var customKeys = customListFor(g.name).map(function(n){ return customSelKey(g.name, n); });
-      var gst = scopeStateOf(scopeNames, customKeys);
+      var gst = scopeStateOf(scopeKeys, customKeys);
       var inner = g.children.map(function(cn){
         var leaf = snapLeafFor(g.name, cn);
         return leaf ? subpartHtml(leaf, g.name) : "";
@@ -4123,7 +4226,7 @@ function renderOrderStart(){
       var extras = snapGroupExtras(g.name);
       return '<div class="media-card"><button type="button" class="scope-head" data-scope-group="' + esc(g.name) + '" aria-pressed="' + (gst === "all") + '">'
         + triCheckHtml(gst) + '<span class="scope-name">' + esc(g.name) + "</span></button>"
-        + (extras.length ? memberChipsHtml(extras) : "")
+        + (extras.length ? memberChipsHtml(groupExtraEntriesFor(g.name)) : "")
         + '<div class="subparts">' + inner + "</div></div>";
     }).join("");
     /* 그룹 카드들은 .groups-grid로 감싸 PC에서 좌우 2열·동일 폭/높이로, 모바일에서 세로로 쌓는다.
@@ -4137,28 +4240,28 @@ function renderOrderStart(){
       Array.prototype.forEach.call(tree.querySelectorAll("[data-scope-group]"), function(b){
         b.addEventListener("click", function(){
           var g = snapGroupDef(b.getAttribute("data-scope-group")); if (!g) return;
-          var names = [], seen = {};
+          var keys = [];
           g.children.forEach(function(cn){
             var leaf = snapLeafFor(g.name, cn) || snapPartDef(cn);
-            if (leaf) leaf.members.forEach(function(n){ if (!seen[n]){ seen[n] = 1; names.push(n); } });
+            if (leaf) leafEntriesFor(leaf, g.name).forEach(function(e){ keys.push(e.key); });
           });
-          snapGroupExtras(g.name).forEach(function(n){ if (!seen[n]){ seen[n] = 1; names.push(n); } });
+          groupExtraEntriesFor(g.name).forEach(function(e){ keys.push(e.key); });
           var customKeys = customListFor(g.name).map(function(n){ return customSelKey(g.name, n); });
-          toggleScopeNames(names, customKeys);
+          toggleScopeNames(keys, customKeys);
         });
       });
       Array.prototype.forEach.call(tree.querySelectorAll("[data-scope-leaf]"), function(b){
         b.addEventListener("click", function(){
           var leafNm = b.getAttribute("data-scope-leaf");
           var leaf = snapLeafFor(b.getAttribute("data-leaf-group") || "", leafNm) || snapPartDef(leafNm); if (!leaf) return;
-          toggleScopeNames(leaf.members.slice());
+          toggleScopeNames(entryKeys(leafEntriesFor(leaf, b.getAttribute("data-leaf-group") || "")));
         });
       });
       Array.prototype.forEach.call(tree.querySelectorAll("[data-member]"), function(b){
         b.addEventListener("click", function(){
           freezeStartSnapNow(); /* 인원 선택을 시작하면 그 시점 명단으로 고정한다 */
-          var n = b.getAttribute("data-member"), i = ui.newSel.indexOf(n);
-          if (i >= 0) ui.newSel.splice(i, 1); else ui.newSel.push(n);
+          var k = b.getAttribute("data-member-key"), i = ui.newSel.indexOf(k);
+          if (i >= 0) ui.newSel.splice(i, 1); else ui.newSel.push(k);
           renderOrderStart();
         });
       });
@@ -4234,7 +4337,7 @@ function renderOrderStart(){
 function enterOrderScreen(channelId){
   var c = channelById(channelId); if (!c) return;
   ui.urlChannelId = c.id; ui.channelId = c.id; ui.cardChannelId = c.id; ui.lastLinkChannelId = c.id;
-  ui.orderTab = "order"; ui.myName = ""; ui.myPart = "";
+  ui.orderTab = "order"; ui.myName = ""; ui.myPart = ""; ui.myKey = "";
   try { history.pushState(null, "", orderLinkFor(c.id)); } catch(e){}
   renderAll();
   window.scrollTo({ top: 0 });
@@ -4251,21 +4354,47 @@ function startNewOrder(){
     if (isNaN(n) || n < 0){ toast("인당 금액 제한을 숫자로 입력해 주세요."); var li = $("newOrderLimit"); if (li) li.focus(); return; }
     if (n > 0) maxPrice = n;
   }
-  var mm = {}, parts = [], customs = [];
-  ui.newSel.forEach(function(name){
-    var lp = leafPartOfName(name);
-    if (lp){
-      if (!mm[lp]){ mm[lp] = []; parts.push(lp); }
-      mm[lp].push(name);
-    } else if (customs.indexOf(name) < 0) customs.push(name);
+  /* 고른 사람을 스냅샷 순서(그룹→파트→자리)대로 한 명씩 옮긴다. 이름이 아니라 자리 키로
+     골라 담으므로, 동명이인이 여러 파트에 있거나 한 파트에 두 번 있어도 각자 자기
+     파트로 들어가고 합쳐지지 않는다. 채널에는 이름 기준 memberMap과 함께, 자리 키를
+     그대로 실은 인원 목록(people)을 남긴다 — 주문 화면·동기화는 이 목록으로 사람을
+     구분한다(memberMap만으로는 동명이인이 다시 합쳐지기 때문이다) */
+  var mm = {}, parts = [], customs = [], people = [], ge = {};
+  var selSet = {};
+  ui.newSel.forEach(function(k){ selSet[k] = 1; });
+  function addPartEntry(part, e){
+    if (!selSet[e.key]) return;
+    people.push({ key: e.key, name: e.name, part: part });
+    if (!mm[part]){ mm[part] = []; parts.push(part); }
+    mm[part].push(e.name);
+  }
+  var S_GROUPS2 = snapGroupList(), S_LEAVES2 = snapLeafList();
+  S_GROUPS2.forEach(function(g){
+    g.children.forEach(function(cn){
+      var leaf = snapLeafFor(g.name, cn); if (!leaf) return;
+      leafEntriesFor(leaf, g.name).forEach(function(e){ addPartEntry(leaf.name, e); });
+    });
+    groupExtraEntriesFor(g.name).forEach(function(e){
+      if (!selSet[e.key]) return;
+      people.push({ key: e.key, name: e.name, part: g.name + " 전용" });
+      if (!ge[g.name]) ge[g.name] = [];
+      ge[g.name].push(e.name);
+    });
+  });
+  assignLeaves(S_LEAVES2, S_GROUPS2).loose.forEach(function(li){
+    var leaf = S_LEAVES2[li];
+    leafEntriesFor(leaf, "").forEach(function(e){ addPartEntry(leaf.name, e); });
   });
   /* 추가 인원 칩에서 고른 사람은 명단에 같은 이름이 있어도 파트 소속이 아니라
-     추가 인원(extraMembers)으로 넣는다 — 칩 선택이 독립적인 것과 같은 기준이다 */
+     추가 인원(extraMembers)으로 넣는다 — 칩 선택이 독립적인 것과 같은 기준이다.
+     그룹이 다르면 이름이 같아도 서로 다른 사람이므로 중복으로 지우지 않는다 */
   customSelList().forEach(function(k){
     var n = k.slice(k.indexOf("\u0001") + 1);
-    if (n && customs.indexOf(n) < 0) customs.push(n);
+    if (!n) return;
+    customs.push(n);
+    people.push({ key: "X|" + encodeURIComponent(k), name: n, part: "개별 추가" });
   });
-  /* 이름만으로 추가한 사람만 있을 때도 명단이 유지되게 ‘개별 추가’ 스냅샷을 함께 남긴다 (중복은 표시 단계에서 한 번만 보인다) */
+  /* 이름만으로 추가한 사람만 있을 때도 명단이 유지되게 ‘개별 추가’ 스냅샷을 함께 남긴다 */
   if (!parts.length && customs.length) mm["개별 추가"] = customs.slice();
   var target = defaultChannel(uid("ch"));
   var now = new Date();
@@ -4276,8 +4405,9 @@ function startNewOrder(){
   target.absent = [];
   target.limits = { cats:{}, maxPrice:maxPrice };
   target.memberMap = Object.keys(mm).length ? mm : null;
-  target.groupExtras = null;
+  target.groupExtras = Object.keys(ge).length ? ge : null;
   target.extraMembers = customs;
+  target.people = people.length ? people : null;
   target.orders = []; target.skips = [];
   target.createdAt = Date.now(); /* 7일 자동 만료의 기준 시각 */
   ensureChannels().push(target);
@@ -4292,7 +4422,7 @@ function renderRoster(){
   var area = $("rosterArea");
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  if (ui.myName && !flat.some(function(p){ return p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; }
+  if ((ui.myName || ui.myKey) && !flat.some(function(p){ return ui.myKey ? p.key===ui.myKey : p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; ui.myKey = ""; }
   if (!activeChannel().parts.length || !flat.length){
     area.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong>관리 화면에서 인원과 가게를 고르고 주문을 시작하면, 여기 이름 명단이 나타납니다.</div>';
     updateSkipNote();
@@ -4300,11 +4430,13 @@ function renderRoster(){
   }
   area.innerHTML = blocks.map(function(b){
     if (!b.members.length) return "";
-    var done = b.members.filter(function(n){ return personStatus(n)==="ordered"; }).length;
-    var chips = b.members.map(function(n){
-      var st = personStatus(n);
+    var done = b.members.filter(function(n, i){ return personStatusP({ name:n, key: b.keys ? b.keys[i] : "" })==="ordered"; }).length;
+    var chips = b.members.map(function(n, i){
+      var pkey = b.keys ? b.keys[i] : "";
+      var st = personStatusP({ name:n, key:pkey });
       var badge = st==="ordered" ? '<span class="st">주문 완료</span>' : st==="skip" ? '<span class="st">Skip</span>' : "";
-      return '<button type="button" class="pchip' + (ui.myName===n ? " sel" : "") + '" data-person="' + esc(n) + '" data-part="' + esc(b.part) + '" data-state="' + st + '" aria-pressed="' + (ui.myName===n) + '">' + esc(n) + badge + "</button>";
+      var sel = pkey ? (ui.myKey===pkey) : (ui.myName===n);
+      return '<button type="button" class="pchip' + (sel ? " sel" : "") + '" data-person="' + esc(n) + '" data-part="' + esc(b.part) + '" data-pkey="' + esc(pkey) + '" data-state="' + st + '" aria-pressed="' + sel + '">' + esc(n) + badge + "</button>";
     }).join("");
     return '<div class="partblock"><h3>' + esc(b.part) + ' <span class="gsum">' + b.members.length + "명 중 " + done + '명 주문 완료</span></h3><div class="pgrid">' + chips + "</div></div>";
   }).join("");
@@ -4312,6 +4444,7 @@ function renderRoster(){
     btn.addEventListener("click", function(){
       ui.myName = btn.getAttribute("data-person");
       ui.myPart = btn.getAttribute("data-part");
+      ui.myKey = btn.getAttribute("data-pkey") || "";
       renderRoster(); renderOrdersList();
     });
   });
@@ -4613,7 +4746,7 @@ function renderOrdersList(){
   }
   var rows = activeChannel().orders.slice().reverse().map(function(o){
     var detail = o.items.map(function(it){ var s = itemSuffix(it); return esc(it.name) + (s ? "(" + esc(s) + ")" : "") + " ×" + it.qty; }).join(", ");
-    var mine = ui.myName && o.name === ui.myName;
+    var mine = o.pkey ? (ui.myKey && o.pkey === ui.myKey) : (ui.myName && o.name === ui.myName);
     return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span> <span class="tempbadge">' + esc(o.group) + "</span>"
       + '<div class="detail">' + detail + '</div></div>'
       + '<span class="amount">' + won(orderTotal(o)) + "</span>"
@@ -4635,13 +4768,13 @@ function renderOrdersList(){
 }
 function updateSkipNote(){
   var note = $("mySkipNote");
-  var mine = ui.myName ? skipOf(ui.myName) : null;
+  var mine = ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null);
   if (mine){
     note.classList.remove("hidden");
     note.innerHTML = '<div class="totalbar"><span class="t">‘' + esc(mine.name) + "’님은 Skip으로 표시돼 있어요.</span>"
       + '<button type="button" class="btn small" id="unskipBtn">Skip 취소</button></div>';
     $("unskipBtn").addEventListener("click", function(){
-      dropSkipsByName(activeChannel(), ui.myName);
+      dropSkipsByPerson(activeChannel(), ui.myName, ui.myKey);
       touch(); toast("Skip을 취소했어요. 이제 주문할 수 있어요.");
     });
   } else { note.classList.add("hidden"); note.innerHTML = ""; }
@@ -5775,8 +5908,8 @@ function renderSummary(){
   } else {
     var html = blocks.map(function(b){
       var ordered = [], skipped = [], pending = [];
-      b.members.forEach(function(n){
-        var st = personStatus(n);
+      b.members.forEach(function(n, i){
+        var st = personStatusP({ name:n, key: b.keys ? b.keys[i] : "" });
         if (st==="ordered") ordered.push(n); else if (st==="skip") skipped.push(n); else pending.push(n);
       });
       return '<div class="groupblock"><h3>' + esc(b.part) + ' <span class="gsum">주문 ' + ordered.length + " · Skip " + skipped.length + " · 미응답 " + pending.length + '</span></h3>'
@@ -5794,10 +5927,10 @@ function renderSummary(){
           }).join("") + "</div>";
     }
     /* 채널 밖에서 들어온 주문/Skip (명단에 없는 이름) */
-    var inRoster = {};
-    rosterFlat(activeChannel().parts, [], chCtx(activeChannel())).forEach(function(p){ inRoster[p.name] = 1; });
-    var extraOrders = activeChannel().orders.filter(function(o){ return !inRoster[o.name]; });
-    var extraSkips = activeChannel().skips.filter(function(s){ return !inRoster[s.name] || activeChannel().absent.indexOf(s.name) >= 0; });
+    var inRoster = {}, inRosterKey = {};
+    rosterFlat(activeChannel().parts, [], chCtx(activeChannel())).forEach(function(p){ inRoster[p.name] = 1; if (p.key) inRosterKey[p.key] = 1; });
+    var extraOrders = activeChannel().orders.filter(function(o){ return o.pkey ? !inRosterKey[o.pkey] : !inRoster[o.name]; });
+    var extraSkips = activeChannel().skips.filter(function(s){ return (s.pkey ? !inRosterKey[s.pkey] : !inRoster[s.name]) || activeChannel().absent.indexOf(s.name) >= 0; });
     if (extraOrders.length || extraSkips.length){
       html += '<div class="groupblock"><h3>명단 밖 응답</h3>'
         + (extraOrders.length ? '<div class="statusline"><span class="sl">주문</span><span class="sn">' + esc(extraOrders.map(function(o){ return o.name; }).join(", ")) + "</span></div>" : "")
@@ -6006,6 +6139,7 @@ if (_inlineCreate) _inlineCreate.addEventListener("click", function(){
     else mm[b.part] = b.members.slice();
   });
   target.memberMap = mm; target.groupExtras = ge; target.extraMembers = ex;
+  target.people = null; /* 이 경로는 이름 기준으로 명단을 다시 만들므로 동명이인 구분 목록은 비운다 */
   ensureChannels().push(target);
   ui.channelId = target.id; ui.cardChannelId = target.id; ui.lastLinkChannelId = target.id;
   ui.cardMode = "view"; ui.inlineDraft = null;
@@ -6150,6 +6284,7 @@ $("setupSaveBtn").addEventListener("click", function(){
     else mm[b.part] = b.members.slice();
   });
   target.memberMap = mm; target.groupExtras = ge; target.extraMembers = ex;
+  target.people = null; /* 이 경로는 이름 기준으로 명단을 다시 만들므로 동명이인 구분 목록은 비운다 */
   ui.channelId = target.id; ui.editChannelId = target.id; ui.lastLinkChannelId = target.id;
   /* 가게가 다른 가게로 바뀌면 이전 가게 메뉴가 담긴 이 채널의 장바구니를 비운다.
      가게가 그대로면 장바구니는 유지한다 */
@@ -6177,9 +6312,11 @@ $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModa
 /* 본인 Skip (주문 화면에서 각자) */
 $("skipBtn").addEventListener("click", function(){
   if (!ui.myName){ toast("먼저 위 명단에서 내 이름을 눌러 주세요."); return; }
-  if (skipOf(ui.myName)){ toast("이미 Skip으로 표시돼 있어요."); updateSkipNote(); return; }
-  dropOrdersByName(activeChannel(), ui.myName);
-  activeChannel().skips.push({ id: uid("skip"), name: ui.myName, group: ui.myPart, ts: Date.now() });
+  if (ui.myKey ? skipOfKey(ui.myKey) : skipOf(ui.myName)){ toast("이미 Skip으로 표시돼 있어요."); updateSkipNote(); return; }
+  dropOrdersByPerson(activeChannel(), ui.myName, ui.myKey);
+  var skipEntry = { id: uid("skip"), name: ui.myName, group: ui.myPart, ts: Date.now() };
+  if (ui.myKey) skipEntry.pkey = ui.myKey; /* 동명이인과 구분되게 고른 사람의 키를 함께 남긴다 */
+  activeChannel().skips.push(skipEntry);
   touch(); toast(ui.myName + "님을 Skip으로 표시했어요. 마음이 바뀌면 취소할 수 있어요.");
 });
 
@@ -6199,9 +6336,9 @@ $("submitBtn").addEventListener("click", function(){
   if (!items.length){ toast("메뉴를 먼저 담아 주세요."); return; }
   var viol = cartViolation();
   if (viol){ toast(viol); return; }
-  dropSkipsByName(activeChannel(), ui.myName);
-  dropOrdersByName(activeChannel(), ui.myName);
-  activeChannel().orders.push({
+  dropSkipsByPerson(activeChannel(), ui.myName, ui.myKey);
+  dropOrdersByPerson(activeChannel(), ui.myName, ui.myKey);
+  var ordEntry = {
     id: uid("ord"), name: ui.myName, group: ui.myPart, storeId: activeChannel().storeId,
     items: items.map(function(it){
       var o = { name: it.name, price: it.price, temp: it.temp, qty: it.qty, cat: it.cat || "" };
@@ -6210,7 +6347,9 @@ $("submitBtn").addEventListener("click", function(){
       return o;
     }),
     ts: Date.now()
-  });
+  };
+  if (ui.myKey) ordEntry.pkey = ui.myKey; /* 동명이인과 구분되게 고른 사람의 키를 함께 남긴다 */
+  activeChannel().orders.push(ordEntry);
   ui.cart = {}; ui.tempSel = {};
   touch();
   toast("주문이 제출됐어요! ‘취합’ 탭에서 바로 확인할 수 있어요.");
