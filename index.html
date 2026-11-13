@@ -71,9 +71,8 @@
       .cart-action-row .submit-wrap{flex:1 1 0}
       .cart-action-row > .btn{flex:1 1 0;min-width:0}
       @media (max-width:480px){ .cart-action-row{gap:6px} .cart-action-row .btn{padding-left:10px;padding-right:10px;font-size:13.5px} }
-      .submit-blocker{position:absolute;inset:0;z-index:2;border-radius:999px;background:transparent;cursor:not-allowed}
-      .submit-blocker:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-      #submitBtn.conn-wait{opacity:.5;filter:saturate(.55)}
+      /* 장바구니 비우기 — 카드 제목 우측 상단의 작은 글자 버튼 */
+      .cart-clear-top{color:var(--danger);border-color:var(--danger-line);background:var(--danger-soft)}
       #submitConnHint{font-size:12.5px;color:var(--muted)}
       .tabs{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0;margin-top:4px}
       .tabs-inner{display:flex;flex-wrap:wrap;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
@@ -414,8 +413,11 @@
       .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
       .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
       .catchip{min-height:34px;padding:4px 13px;font-size:13.5px}
-      /* 제출된 주문 [내 메뉴 / 멤버 메뉴] 탭 */
+      /* 카테고리를 고르면 그 카테고리 메뉴만 이 영역 안에서 스크롤된다 */
+      #menuArea.cat-locked{max-height:min(560px,62vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:2px 4px 2px 2px}
+      /* 제출된 주문 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 — 숫자 5칸 바로 아래 한 줄 묶음 */
       .ordertabs{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:16px}
+      #byMenu,#ordersList{margin-top:10px}
       .otab{flex:1 1 0;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:7px;font-weight:800;font-size:14px;min-height:38px;cursor:pointer}
       .otab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
       /* 메뉴 추가·편집 팝업 (모달) — 목록에서 바로 떠서 고친다 */
@@ -707,19 +709,16 @@
             <div class="card" id="cartCard">
               <div class="section-head">
                 <div><h2>내 장바구니</h2></div>
+                <button class="btn small cart-clear-top" id="cartClearBtn" type="button">비우기</button>
               </div>
               <div id="cartList"></div>
               <div class="totalbar"><span class="t">내 주문 합계</span><span class="v" id="cartTotal">0원</span></div>
               <p class="hint hidden" id="cartLimitNote"></p>
               <div class="btnrow mt cart-action-row">
                 <span class="submit-wrap" id="submitWrap">
-                  <button class="btn primary conn-wait" id="submitBtn" type="button" disabled aria-disabled="true">주문 제출하기</button>
-                  <span class="submit-blocker" id="submitBlocker" role="button" tabindex="0" aria-label="연결 중이라 아직 주문을 제출할 수 없어요"></span>
+                  <button class="btn primary" id="submitBtn" type="button">주문 제출하기</button>
                 </span>
                 <button class="btn green" id="skipBtn" type="button">Skip · 주문 안 함</button>
-              </div>
-              <div class="btnrow mt">
-                <button class="btn ghost" id="cartClearBtn" type="button">장바구니 비우기</button>
               </div>
               <div id="mySkipNote" class="mt hidden"></div>
               <p class="hint" id="submitConnHint" role="status">연결하는 중…</p>
@@ -736,9 +735,8 @@
                 <div class="stat stat-skip"><div class="k">Skip</div><div class="v" id="statSkip">0<small> 명</small></div></div>
                 <div class="stat stat-pending"><div class="k">아직 안 함</div><div class="v" id="statPending">0<small> 명</small></div></div>
               </div>
-              <h3 class="card-subhead">메뉴별 합계</h3>
+              <div class="ordertabs" id="ordersTabs" role="tablist" aria-label="제출된 주문 보기"></div>
               <div id="byMenu"></div>
-              <div class="ordertabs" id="ordersTabs" role="tablist" aria-label="주문 내역 구분"></div>
               <div id="ordersList"></div>
               <div class="btnrow mt">
                 <button class="btn primary" id="copyAllBtn" type="button">취합 내용 복사</button>
@@ -1886,7 +1884,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", personQuery:"", ordersTab:"mine", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", personQuery:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -2554,11 +2552,11 @@ try { bcChannel = new BroadcastChannel("jumun-cwihab-state-v1"); } catch(e){ bcC
 var syncConnected = false, syncPhase = "connecting";
 function refreshSubmitState(){
   var btn = $("submitBtn"); if (!btn) return;
+  /* 제출 버튼은 비활성화로 숨기지 않는다 — 연결 전에도 눌러 볼 수 있고,
+     누르면 이름·연결 등 뭐가 빠졌는지 클릭 핸들러가 알려준다 */
   var blocked = !syncConnected;
-  btn.disabled = blocked;
-  btn.setAttribute("aria-disabled", blocked ? "true" : "false");
-  btn.classList.toggle("conn-wait", blocked);
-  var blocker = $("submitBlocker"); if (blocker) blocker.classList.toggle("hidden", !blocked);
+  btn.disabled = false;
+  btn.removeAttribute("aria-disabled");
   var hint = $("submitConnHint");
   if (hint){
     if (blocked){
@@ -4815,12 +4813,14 @@ function renderMenuArea(){
     if (chipsEarly) chipsEarly.innerHTML = "";
     $("menuHeadSub").textContent = "";
     $("menuHeadSub").classList.add("hidden");
+    area.classList.remove("cat-locked");
     area.innerHTML = '<div class="empty"><strong>가게가 정해지지 않았어요</strong></div>';
     return;
   }
   if (!rs.menus || !rs.menus.length){
     if (searchWrap) searchWrap.classList.add("hidden");
     if (chipsEarly) chipsEarly.innerHTML = "";
+    area.classList.remove("cat-locked");
     area.innerHTML = '<div class="empty"><strong>이 가게에 메뉴가 아직 없어요</strong></div>';
     return;
   }
@@ -4837,6 +4837,9 @@ function renderMenuArea(){
       b.addEventListener("click", function(){ ui.menuCat = b.getAttribute("data-mcat") || ""; renderMenuArea(); });
     });
   }
+  /* 카테고리를 고른 상태에서는 메뉴 영역이 자체 스크롤 상자가 된다 —
+     그 카테고리 안에서만 스크롤되고, ‘전체’로 돌아오면 페이지 스크롤로 풀린다 */
+  area.classList.toggle("cat-locked", !!ui.menuCat);
   /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음).
      검색 중에는 맞는 메뉴가 없는 카테고리는 통째로 숨겨진다 */
   var query = (ui.menuQuery || "").trim().toLowerCase();
@@ -5032,7 +5035,7 @@ function renderCart(){
   } else {
     note.textContent = ""; note.classList.add("hidden");
   }
-  $("submitBtn").textContent = ui.myName ? (ui.myName + " 이름으로 주문 제출하기") : "주문 제출하기 — 먼저 이름을 고르세요";
+  /* 제출 버튼 이름은 늘 ‘주문 제출하기’ 그대로 둔다 — 이름을 안 골랐으면 누를 때 경고로 알려준다 */
   var mCountEl = $("mobileCartCount"), mTotalEl = $("mobileCartTotal");
   if (mCountEl) mCountEl.textContent = items.reduce(function(a,it){ return a + it.qty; }, 0) + "개";
   if (mTotalEl) mTotalEl.textContent = won(tot);
@@ -5086,20 +5089,27 @@ function restoreOrderToCart(orderId){
   var cc = $("cartCard");
   if (cc) cc.scrollIntoView({ behavior: "smooth", block: "center" });
 }
-/* 제출된 주문 내역 — [내 메뉴]에는 내 제출분만(취소·되돌리기 버튼 포함),
+/* 제출된 주문 내역 — 숫자 5칸 아래 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 한 묶음.
+   기본 탭은 메뉴별 합계(#byMenu, renderSummary가 채운다)이고,
+   [내 메뉴]에는 내 제출분만(취소·되돌리기 버튼 포함),
    [멤버 메뉴]에는 다른 사람별로 이름과 주문한 메뉴를 보여 준다 */
 function renderOrdersList(){
-  var el = $("ordersList"), tabsEl = $("ordersTabs");
+  var el = $("ordersList"), tabsEl = $("ordersTabs"), bmEl = $("byMenu");
+  var tab = (ui.ordersTab === "mine" || ui.ordersTab === "members") ? ui.ordersTab : "bymenu";
   function isMine(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
   var mineOrder = null;
   activeChannel().orders.forEach(function(o){ if (!mineOrder && isMine(o)) mineOrder = o; });
   if (tabsEl){
-    tabsEl.innerHTML = '<button type="button" class="otab" role="tab" data-otab="mine" aria-selected="' + (ui.ordersTab !== "members") + '">내 메뉴</button>'
-      + '<button type="button" class="otab" role="tab" data-otab="members" aria-selected="' + (ui.ordersTab === "members") + '">멤버 메뉴</button>';
+    tabsEl.innerHTML = '<button type="button" class="otab" role="tab" data-otab="bymenu" aria-selected="' + (tab === "bymenu") + '">메뉴별 합계</button>'
+      + '<button type="button" class="otab" role="tab" data-otab="mine" aria-selected="' + (tab === "mine") + '">내 메뉴</button>'
+      + '<button type="button" class="otab" role="tab" data-otab="members" aria-selected="' + (tab === "members") + '">멤버 메뉴</button>';
     Array.prototype.forEach.call(tabsEl.querySelectorAll("[data-otab]"), function(b){
       b.addEventListener("click", function(){ ui.ordersTab = b.getAttribute("data-otab"); renderOrdersList(); });
     });
   }
+  if (bmEl) bmEl.classList.toggle("hidden", tab !== "bymenu");
+  if (el) el.classList.toggle("hidden", tab === "bymenu");
+  if (tab === "bymenu") return;
   function rowHtml(o, mine){
     var detail = o.items.map(function(it){ var s = itemSuffix(it); return esc(it.name) + (s ? "(" + esc(s) + ")" : "") + " ×" + it.qty; }).join(", ");
     return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span> <span class="tempbadge">' + esc(o.group) + "</span>"
@@ -6633,18 +6643,11 @@ $("skipBtn").addEventListener("click", function(){
   touch(); toast(ui.myName + " · Skip · 주문 안 함");
 });
 
-var _submitBlocker = $("submitBlocker");
-if (_submitBlocker){
-  var _blockedMsg = function(){
-    toast(syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…");
-  };
-  _submitBlocker.addEventListener("click", _blockedMsg);
-  _submitBlocker.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); _blockedMsg(); } });
-}
 $("submitBtn").addEventListener("click", function(){
-  if (!syncConnected){ toast(syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…"); return; }
-  if (!roundStore()){ toast("가게가 선택되지 않은 채널이에요. 먼저 가게를 선택해 주세요."); return; }
+  /* 버튼은 항상 눌러 볼 수 있다 — 빠진 게 있으면 그걸 먼저 알려준다 */
   if (!ui.myName){ toast("먼저 이름을 선택해 주세요."); return; }
+  if (!roundStore()){ toast("가게가 선택되지 않은 채널이에요. 먼저 가게를 선택해 주세요."); return; }
+  if (!syncConnected){ toast(syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…"); return; }
   var items = cartItems();
   if (!items.length){ toast("메뉴를 먼저 담아 주세요."); return; }
   var viol = cartViolation();
