@@ -349,10 +349,6 @@
       .menugrouphead h3{display:flex;align-items:baseline;gap:8px}
       .menugrouphead h3 .gsum{color:var(--muted);font-size:13px;font-weight:700}
       .hidden{display:none !important}
-      .ordermode-banner{background:var(--green-soft);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-      .ordermode-banner .t{font-weight:800;font-size:15px}
-      .ordermode-banner .s{color:var(--muted);font-size:13.5px;margin-top:2px}
-      #orderCopyLinkBtn{min-height:50px;padding:10px 24px;font-size:16px}
       body.order-mode .admin-only{display:none !important}
       body:not(.order-mode) .order-only{display:none !important}
       .mt{margin-top:10px}
@@ -453,6 +449,8 @@
       .page-top-main{min-width:0;flex:1 1 160px}
       .admin-actions{display:flex;gap:6px;flex:none;margin-left:auto;justify-content:flex-end;flex-wrap:wrap;padding-top:2px}
       .admin-actions .btn{min-height:34px;padding:5px 11px;font-size:13px;border-radius:999px;white-space:nowrap}
+      /* 제출된 주문 카드 안 소제목 (메뉴별 합계·주문 내역 구분) */
+      .card-subhead{margin-top:16px;margin-bottom:2px}
       .channel-card-head{margin-bottom:10px}
       .channel-card-head h2{font-size:19px}
       span.pchip{cursor:default}
@@ -563,6 +561,13 @@
         body:not(.order-mode) .page-top-main{flex:0 1 auto;text-align:center}
         body:not(.order-mode) .admin-actions{position:absolute;top:0;right:0;margin-left:0}
         body:not(.order-mode) .sync-status{justify-content:center}
+        /* 주문 화면 헤더도 주문 생성하기 화면과 같은 배치 — 제목·연결 상태는 가운데,
+           주문 링크 복사·관리 화면으로 가기는 가게 관리·파트 관리와 같은 오른쪽 위 자리 */
+        body.order-mode header{position:relative;margin-bottom:10px}
+        body.order-mode .page-top{justify-content:center}
+        body.order-mode .page-top-main{flex:0 1 auto;text-align:center}
+        body.order-mode .order-actions{position:absolute;top:0;right:0;margin-left:0}
+        body.order-mode .sync-status{justify-content:center}
       }
       @media (max-width:480px){
         .media-card{padding:6px}
@@ -617,6 +622,10 @@
             <button class="btn small" id="openStoresBtn" type="button">가게 관리</button>
             <button class="btn small" id="openPartsBtn" type="button">파트 관리</button>
           </div>
+          <div class="admin-actions order-actions order-only">
+            <button class="btn small primary" id="orderCopyLinkBtn" type="button">주문 링크 복사</button>
+            <a class="btn small" id="toAdminBtn" href="#" style="text-decoration:none;display:inline-flex;align-items:center">관리 화면으로 가기</a>
+          </div>
         </div>
 
         <div class="sync-status" id="syncStatus" role="status" aria-live="polite" data-state="connecting" style="margin-top:10px">
@@ -625,27 +634,13 @@
         </div>
       </header>
 
-      <div class="ordermode-banner order-only">
-        <div class="btnrow">
-          <button class="btn primary" id="orderCopyLinkBtn" type="button">주문 링크 복사</button>
-          <a class="btn" id="toAdminBtn" href="#" style="text-decoration:none;display:inline-flex;align-items:center">관리 화면으로 가기</a>
-        </div>
-      </div>
-
-      <nav class="tabs order-only" id="orderTabs" aria-label="주문 화면 전환">
-        <div class="tabs-inner" role="tablist">
-          <button class="tab" role="tab" id="tab-order" aria-selected="true" data-otab="order" type="button">주문</button>
-          <button class="tab" role="tab" id="tab-summary" aria-selected="false" data-otab="summary" type="button">취합</button>
-        </div>
-      </nav>
-
       <!-- ===== 주문 (주문 링크로 들어왔을 때만 보임) ===== -->
-      <section id="view-order" role="tabpanel" aria-labelledby="tab-order">
+      <section id="view-order" aria-label="주문">
         <div class="order-layout">
           <div class="order-main">
             <div class="card">
               <div class="section-head">
-                <div><h2>내 이름 고르기</h2></div>
+                <div><h2>이름 선택</h2></div>
               </div>
               <div id="rosterArea"></div>
               <div class="btnrow mt">
@@ -684,11 +679,32 @@
               <p class="hint" id="submitConnHint" role="status">연결하는 중…</p>
             </div>
 
-            <div class="card">
+            <div class="card" id="submittedCard">
               <div class="section-head">
                 <div><h2>제출된 주문</h2></div>
               </div>
+              <div class="stats">
+                <div class="stat"><div class="k">총액</div><div class="v" id="statTotal">0원</div></div>
+                <div class="stat"><div class="k">주문 완료</div><div class="v" id="statPeople">0<small> 명</small></div></div>
+                <div class="stat"><div class="k">전체 수량</div><div class="v" id="statQty">0<small> 개</small></div></div>
+                <div class="stat stat-skip"><div class="k">Skip · 주문 안 함</div><div class="v" id="statSkip">0<small> 명</small></div></div>
+                <div class="stat stat-pending"><div class="k">아직 안 함</div><div class="v" id="statPending">0<small> 명</small></div></div>
+              </div>
+              <div id="statusBoard"></div>
+              <h3 class="card-subhead">메뉴별 합계</h3>
+              <div id="byMenu"></div>
+              <h3 class="card-subhead">주문 내역</h3>
               <div id="ordersList"></div>
+              <div class="btnrow mt">
+                <button class="btn primary" id="copyStoreBtn" type="button">가게 전달용 복사</button>
+                <button class="btn" id="copyAllBtn" type="button">전체 취합 복사 (파트별)</button>
+                <button class="btn danger" id="clearOrdersBtn" type="button">주문 전체 비우기</button>
+              </div>
+              <div id="clearConfirm" class="hidden"></div>
+              <div id="copyFallback" class="hidden mt">
+                <label class="flabel" for="copyBox">복사가 막히면 아래 내용을 길게 눌러 복사하세요</label>
+                <textarea class="copybox" id="copyBox" readonly></textarea>
+              </div>
             </div>
           </aside>
         </div>
@@ -737,46 +753,6 @@
         </div>
       </section>
 
-      <!-- ===== 취합 ===== -->
-      <section id="view-summary" role="tabpanel" aria-labelledby="tab-summary" aria-label="취합">
-        <div class="card">
-          <div class="section-head">
-            <div><h2>취합 한눈에 보기</h2><p class="sub" id="summarySub"></p></div>
-          </div>
-          <div class="stats">
-            <div class="stat"><div class="k">총액</div><div class="v" id="statTotal">0원</div></div>
-            <div class="stat"><div class="k">주문 완료</div><div class="v" id="statPeople">0<small> 명</small></div></div>
-            <div class="stat"><div class="k">전체 수량</div><div class="v" id="statQty">0<small> 개</small></div></div>
-            <div class="stat stat-skip"><div class="k">Skip · 주문 안 함</div><div class="v" id="statSkip">0<small> 명</small></div></div>
-            <div class="stat stat-pending"><div class="k">아직 안 함</div><div class="v" id="statPending">0<small> 명</small></div></div>
-          </div>
-          <div class="btnrow mt">
-            <button class="btn primary" id="copyStoreBtn" type="button">가게 전달용 복사</button>
-            <button class="btn" id="copyAllBtn" type="button">전체 취합 복사 (파트별)</button>
-            <button class="btn danger" id="clearOrdersBtn" type="button">주문 전체 비우기</button>
-          </div>
-          <div id="clearConfirm" class="hidden"></div>
-          <div id="copyFallback" class="hidden mt">
-            <label class="flabel" for="copyBox">복사가 막히면 아래 내용을 길게 눌러 복사하세요</label>
-            <textarea class="copybox" id="copyBox" readonly></textarea>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="section-head"><div><h2>인원 현황</h2></div></div>
-          <div id="statusBoard"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-head"><div><h2>메뉴별 합계</h2></div></div>
-          <div id="byMenu"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-head"><div><h2>파트별 주문</h2></div></div>
-          <div id="byGroup"></div>
-        </div>
-      </section>
     </div>
 
     <!-- 메뉴 추가·편집 팝업: 목록에서 ‘편집’을 누르면 그 자리에서 바로 뜬다 -->
@@ -1850,7 +1826,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", orderTab:"order", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -3946,28 +3922,23 @@ function renderAll(){
   refreshStoreCounts(); /* 렌더가 끝난 시점의 라이브 상태로 개수를 한 번 더 맞춰 즉시 반영을 보장한다 */
   restoreForms(snap);
 }
-/* 화면 모드: 관리(가게 관리·채널 설정 2탭) vs 주문 링크(주문+취합만) */
+/* 화면 모드: 관리(주문 생성하기) vs 주문 링크(주문 취합하기 — 주문과 취합을 한 페이지로) */
 function applyVisibility(){
   var orderMode = isOrderMode();
   document.body.classList.toggle("order-mode", orderMode);
-  var pageTitleText = orderMode ? "Media 주문 취합하기" : "주문 생성하기";
+  var pageTitleText = orderMode ? "주문 취합하기" : "주문 생성하기";
   if (document.title !== pageTitleText) document.title = pageTitleText;
   var pageTitleEl = $("pageTitle");
   if (pageTitleEl && pageTitleEl.textContent !== pageTitleText) pageTitleEl.textContent = pageTitleText;
   var adminBtn = $("toAdminBtn");
   if (adminBtn) adminBtn.href = adminLinkUrl();
   var mcb = $("mobileCartBar");
-  if (mcb) mcb.classList.toggle("hiddenbar", !(orderMode && ui.orderTab === "order"));
+  if (mcb) mcb.classList.toggle("hiddenbar", !orderMode);
   if (orderMode){
-    $("view-order").classList.toggle("hidden", ui.orderTab !== "order");
-    $("view-summary").classList.toggle("hidden", ui.orderTab !== "summary");
+    $("view-order").classList.remove("hidden");
     var vc = $("view-channel"); if (vc) vc.classList.add("hidden");
-    var to = $("tab-order"), tsm = $("tab-summary");
-    if (to) to.setAttribute("aria-selected", ui.orderTab === "order" ? "true" : "false");
-    if (tsm) tsm.setAttribute("aria-selected", ui.orderTab === "summary" ? "true" : "false");
   } else {
     $("view-order").classList.add("hidden");
-    $("view-summary").classList.add("hidden");
     var vc2 = $("view-channel"); if (vc2) vc2.classList.remove("hidden");
   }
 }
@@ -4546,7 +4517,7 @@ function renderOrderStart(){
 function enterOrderScreen(channelId){
   var c = channelById(channelId); if (!c) return;
   ui.urlChannelId = c.id; ui.channelId = c.id; ui.cardChannelId = c.id; ui.lastLinkChannelId = c.id;
-  ui.orderTab = "order"; ui.myName = ""; ui.myPart = ""; ui.myKey = "";
+  ui.myName = ""; ui.myPart = ""; ui.myKey = "";
   try { history.pushState(null, "", orderLinkFor(c.id)); } catch(e){}
   renderAll();
   window.scrollTo({ top: 0 });
@@ -6149,8 +6120,6 @@ function renderSummary(){
   $("statQty").innerHTML = t.qty + "<small> 개</small>";
   $("statSkip").innerHTML = t.skips + "<small> 명</small>";
   $("statPending").innerHTML = t.pending + "<small> 명</small>";
-  var rs = roundStore();
-  $("summarySub").textContent = (activeChannel().title || "검증1") + (rs ? " · " + rs.name : "");
   /* 인원 현황 */
   var board = $("statusBoard");
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
@@ -6215,24 +6184,6 @@ function renderSummary(){
       + '<span class="aq">× ' + a.qty + '</span><span class="amount">' + won(a.amount) + "</span>"
       + '<span class="awho">' + esc(a.who.join(" · ")) + "</span></div>";
   }).join("");
-  /* 파트별 주문 */
-  var bg = $("byGroup");
-  if (!activeChannel().orders.length) bg.innerHTML = '<div class="empty"><strong>파트별 주문이 아직 없어요</strong></div>';
-  else {
-    var groupsInOrders = [];
-    activeChannel().orders.forEach(function(o){ if (groupsInOrders.indexOf(o.group) < 0) groupsInOrders.push(o.group); });
-    activeChannel().parts.forEach(function(g){ if (groupsInOrders.indexOf(g) < 0) groupsInOrders.push(g); });
-    bg.innerHTML = groupsInOrders.map(function(g){
-      var os = activeChannel().orders.filter(function(o){ return o.group === g; });
-      if (!os.length) return "";
-      var sub = os.reduce(function(a,o){ return a + orderTotal(o); }, 0);
-      var rows = os.map(function(o){
-        var detail = o.items.map(function(it){ var s = itemSuffix(it); return esc(it.name) + (s ? "(" + esc(s) + ")" : "") + " ×" + it.qty; }).join(", ");
-        return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span><div class="detail">' + detail + '</div></div><span class="amount">' + won(orderTotal(o)) + "</span></div>";
-      }).join("");
-      return '<div class="groupblock"><h3>' + esc(g) + ' <span class="gsum">' + os.length + "명 · 소계 " + won(sub) + "</span></h3>" + rows + "</div>";
-    }).join("") || '<div class="empty"><strong>파트별 주문이 아직 없어요</strong></div>';
-  }
   updateSkipNote();
 }
 
@@ -6307,15 +6258,7 @@ function switchTab(name){
 Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
   b.addEventListener("click", function(){ switchTab(b.getAttribute("data-tab")); });
 });
-/* 주문 전용 화면의 주문/취합 탭 — 관리 화면 탭과 같은 방식으로 동작한다 */
-function switchOrderTab(name){
-  ui.orderTab = (name === "summary") ? "summary" : "order";
-  applyVisibility();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-Array.prototype.forEach.call(document.querySelectorAll("[data-otab]"), function(b){
-  b.addEventListener("click", function(){ switchOrderTab(b.getAttribute("data-otab")); });
-});
+
 
 /* ---------- events ---------- */
 /* A안: 채널 카드 콤보박스(타이핑 검색) + 생성 폼 + 상단 채널/가게/파트 관리 버튼 */
@@ -6621,8 +6564,8 @@ $("submitBtn").addEventListener("click", function(){
   ui.cart = {}; ui.tempSel = {};
   touch();
   toast("주문이 제출됐어요.");
-  if (isOrderMode()) switchOrderTab("summary");
-  else { var sv = $("view-summary"); if (sv) sv.scrollIntoView({ behavior:"smooth", block:"start" }); }
+  var sc = $("submittedCard");
+  if (sc) sc.scrollIntoView({ behavior:"smooth", block:"start" });
 });
 $("cartClearBtn").addEventListener("click", function(){ ui.cart = {}; renderMenuArea(); renderCart(); });
 /* 메뉴 검색 입력 — 검색 칸은 메뉴 목록(#menuArea) 밖에 있어 다시 그려도 입력값과 포커스가 유지된다 */
