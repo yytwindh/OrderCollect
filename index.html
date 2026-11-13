@@ -393,10 +393,13 @@
       .pchip[data-state="pending"]{border-color:var(--line-strong)}
       /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
       .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
-      .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-      .catchip{min-height:34px;padding:4px 13px;font-size:13.5px}
-      /* 카테고리를 고르면 그 카테고리 메뉴만 이 영역 안에서 스크롤된다 */
-      #menuArea.cat-locked{max-height:min(560px,62vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:2px 4px 2px 2px}
+      /* 카테고리 바 — 한 줄로 작게, 넘치면 가로로 스크롤한다. 검색창과 함께 위에 고정(.menu-tools)된다 */
+      .catchips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;overscroll-behavior-x:contain;
+        -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+      .catchips::-webkit-scrollbar{display:none}
+      .catchip{min-height:34px;padding:4px 13px;font-size:13.5px;flex:none;white-space:nowrap}
+      /* 메뉴 목록은 내부 스크롤 상자 없이 페이지 전체 스크롤로 쭉 보인다 —
+         카테고리 필터가 걸려도 #menuArea에 높이 제한·자체 스크롤을 두지 않는다 */
       /* 제출된 주문 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 — 숫자 5칸 바로 아래 한 줄 묶음 */
       .ordertabs{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:16px}
       #byMenu,#ordersList{margin-top:10px}
@@ -4720,14 +4723,12 @@ function renderMenuArea(){
     if (chipsEarly) chipsEarly.innerHTML = "";
     $("menuHeadSub").textContent = "";
     $("menuHeadSub").classList.add("hidden");
-    area.classList.remove("cat-locked");
     area.innerHTML = '<div class="empty"><strong>가게가 정해지지 않았어요</strong></div>';
     return;
   }
   if (!rs.menus || !rs.menus.length){
     if (searchWrap) searchWrap.classList.add("hidden");
     if (chipsEarly) chipsEarly.innerHTML = "";
-    area.classList.remove("cat-locked");
     area.innerHTML = '<div class="empty"><strong>이 가게에 메뉴가 아직 없어요</strong></div>';
     return;
   }
@@ -4737,16 +4738,29 @@ function renderMenuArea(){
   var chipEl = $("orderCatChips");
   var catsPresent = storeCategories(rs).filter(function(c){ return rs.menus.some(function(m){ return menuCat(m) === c; }); });
   if (ui.menuCat && catsPresent.indexOf(ui.menuCat) < 0) ui.menuCat = "";
+  /* 칩마다 그 카테고리의 메뉴 개수를 붙인다 — ‘전체’에는 전체 개수를 붙인다 */
+  var catCounts = {};
+  rs.menus.forEach(function(m){ var c = menuCat(m); catCounts[c] = (catCounts[c] || 0) + 1; });
   if (chipEl){
-    chipEl.innerHTML = '<button type="button" class="chip catchip" data-mcat="" aria-pressed="' + (!ui.menuCat) + '">전체</button>'
-      + catsPresent.map(function(c){ return '<button type="button" class="chip catchip" data-mcat="' + esc(c) + '" aria-pressed="' + (ui.menuCat === c) + '">' + esc(c) + "</button>"; }).join("");
+    chipEl.innerHTML = '<button type="button" class="chip catchip" data-mcat="" aria-pressed="' + (!ui.menuCat) + '">전체 <span class="cnt2">(' + rs.menus.length + ")</span></button>"
+      + catsPresent.map(function(c){ return '<button type="button" class="chip catchip" data-mcat="' + esc(c) + '" aria-pressed="' + (ui.menuCat === c) + '">' + esc(c) + ' <span class="cnt2">(' + (catCounts[c] || 0) + ")</span></button>"; }).join("");
     Array.prototype.forEach.call(chipEl.querySelectorAll("[data-mcat]"), function(b){
-      b.addEventListener("click", function(){ ui.menuCat = b.getAttribute("data-mcat") || ""; renderMenuArea(); });
+      b.addEventListener("click", function(){
+        ui.menuCat = b.getAttribute("data-mcat") || "";
+        renderMenuArea();
+        /* 카테고리를 바꾸면 메뉴 목록을 맨 위로 올린다 — 메뉴 카드가 화면 위쪽에 오게 페이지 스크롤을 되돌린다 */
+        var card = area.closest ? area.closest(".card") : null;
+        var anchor = card || area;
+        var y = anchor.getBoundingClientRect().top + window.pageYOffset - 8;
+        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: Math.max(0, y), behavior: reduce ? "auto" : "smooth" });
+        /* 고른 칩이 가로 스크롤 바 안에서 보이도록 칩 바도 함께 맞춘다 */
+        var active = chipEl.querySelector('[aria-pressed="true"]');
+        if (active) chipEl.scrollLeft = Math.max(0, active.offsetLeft - 6);
+      });
     });
   }
-  /* 카테고리를 고른 상태에서는 메뉴 영역이 자체 스크롤 상자가 된다 —
-     그 카테고리 안에서만 스크롤되고, ‘전체’로 돌아오면 페이지 스크롤로 풀린다 */
-  area.classList.toggle("cat-locked", !!ui.menuCat);
+  /* 메뉴 목록은 필터가 걸려 있어도 내부 스크롤 상자 없이 페이지 전체 스크롤로 보인다 */
   /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음).
      검색 중에는 맞는 메뉴가 없는 카테고리는 통째로 숨겨진다 */
   var query = (ui.menuQuery || "").trim().toLowerCase();
