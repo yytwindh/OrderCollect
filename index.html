@@ -385,37 +385,12 @@
       }
       @media (min-width:1024px){ .mobile-cart-bar{display:none !important} }
       .order-restore-row{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
-      /* 주문 화면 A안 — 상단 작은 줄(나: 이름 + 내 상태 알약 + 취소·변경). 긴 이름 칩 그리드를 대신한다.
-         전체 인원 숫자 요약과 ‘현황 보기’는 두지 않는다 — 내 상태만 이름 옆 알약으로 보여준다 */
-      .mebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
-      .mebar-me{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:42px}
-      .mebar-name{font-size:15.5px}
-      /* 내 상태 알약 — 주문 완료(초록)·Skip(회색)·아직 안 함(주황). 이름을 고르지 않았으면 보이지 않는다 */
-      .mestatus{display:inline-flex;align-items:center;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800;line-height:1.4;white-space:nowrap}
-      .mestatus.ordered{background:var(--green);color:#0C3524}
-      @media (prefers-color-scheme: dark){ .mestatus.ordered{color:#0E241A} }
-      .mestatus.skip{background:var(--chip);color:var(--muted);border:1px solid var(--line-strong)}
-      .mestatus.pending{background:var(--peach);color:#8A4B12}
-      @media (prefers-color-scheme: dark){ .mestatus.pending{color:#F2C49B} }
-      /* 스트립의 취소 버튼 — 내가 주문한 상태일 때만 보인다 (빨간 버튼) */
-      .mebar-cancel{background:var(--danger-solid);border-color:var(--danger-solid);color:#fff}
-      .mebar-cancel:hover{background:var(--danger-solid-hover);border-color:var(--danger-solid-hover)}
-      /* 이름 선택 팝업 — 모바일에서도 바텀시트가 아니라 가운데 모달로 뜬다 */
-      #personModal{align-items:center;padding:16px}
-      #personModal .modal-sheet{border-radius:28px;box-shadow:0 18px 50px rgba(15,118,110,.22)}
-      #personList{margin-top:12px}
-      .prows{display:flex;flex-direction:column;gap:6px}
-      .prow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);
-        border-radius:14px;padding:9px 12px;min-height:46px;cursor:pointer;color:var(--ink)}
-      .prow:hover{border-color:var(--line-strong)}
-      .prow:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-      .prow.sel{background:var(--mint);border-color:var(--green)}
-      .prow .pname{font-weight:800;font-size:15px;flex:none}
-      .prow .pstat-wrap{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-width:0}
-      .pstat{font-size:13.5px;font-weight:700;text-align:right}
-      .pstat.ordered{color:var(--green-text)}
-      .pstat.skip{color:var(--muted)}
-      .pstat.pending{color:var(--warn-text)}
+      /* 이름 선택 카드 — 그룹 › 파트 조직도처럼 전원을 칩으로 전부 펼쳐 보여준다.
+         검색창·팝업·접기·내부 스크롤 없이 카드 안에 그대로 나열하고, 칩을 누르면 그 사람이 나로 선택된다.
+         칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시(.pchip .st)가 이름 옆에 붙는다 */
+      button.pchip{cursor:pointer}
+      button.pchip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+      .pchip[data-state="pending"]{border-color:var(--line-strong)}
       /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
       .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
       .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -686,15 +661,10 @@
         <div class="order-layout">
           <div class="order-main">
             <div class="card">
-              <div class="mebar" id="meBar">
-                <div class="mebar-me">
-                  <span class="mebar-name" id="meBarName"></span>
-                  <span class="mestatus hidden" id="meBarStatus"></span>
-                  <button class="btn primary" id="mePickBtn" type="button">나를 선택해 주세요</button>
-                  <button class="btn small mebar-cancel hidden" id="meCancelBtn" type="button">취소</button>
-                  <button class="btn small hidden" id="meChangeBtn" type="button">변경</button>
-                </div>
+              <div class="section-head">
+                <div><h2>이름 선택</h2></div>
               </div>
+              <div id="nameSelectArea"></div>
             </div>
 
             <div class="card">
@@ -802,21 +772,6 @@
         </div>
       </section>
 
-    </div>
-
-    <!-- 이름 선택 팝업 (A안): 가운데 모달 — 이름만 고르는 곳이다 (취소 버튼은 넣지 않는다).
-         줄마다 이름 + 상태(주문한 메뉴는 초록, Skip은 회색, 아직 안 함은 주황)가 보인다 -->
-    <div class="modal hidden" id="personModal" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
-      <div class="modal-backdrop" id="personModalBackdrop"></div>
-      <div class="modal-sheet">
-        <div class="modal-head">
-          <h3 id="personModalTitle">내 이름 선택</h3>
-          <button class="modal-close" id="personModalCloseBtn" type="button" aria-label="팝업 닫기">×</button>
-        </div>
-        <label class="flabel" for="personSearch">이름 검색</label>
-        <input class="field" id="personSearch" type="search" placeholder="이름으로 검색" autocomplete="off" />
-        <div id="personList"></div>
-      </div>
     </div>
 
     <!-- 메뉴 추가·편집 팝업: 목록에서 ‘편집’을 누르면 그 자리에서 바로 뜬다 -->
@@ -1890,7 +1845,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", personQuery:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -1936,7 +1891,6 @@ function _closeModalById(id, fromPop){
   else if (id === "gongchaModal") closeGongchaModal(fromPop);
   else if (id === "sizeModal") closeSizeModal(fromPop);
   else if (id === "storePickModal") applyStorePick(fromPop);
-  else if (id === "personModal") closePersonModal(fromPop);
   else { var el = $(id); if (el) el.classList.add("hidden"); _trackModalClose(id, fromPop); }
 }
 window.addEventListener("popstate", function(){
@@ -4685,86 +4639,32 @@ function startNewOrder(){
   enterOrderScreen(target.id);
   toast("주문을 시작했어요. ‘주문 링크 복사’로 카톡에 공유하세요.");
 }
-/* 주문 화면 상단 작은 줄(A안) — 긴 이름 칩 그리드 대신 ‘나: 이름 + 내 상태 알약 + 취소·변경’ 한 줄만 둔다.
-   전체 인원 숫자(주문 완료 N · Skip N · 아직 안 함 N)와 ‘현황 보기’는 두지 않는다.
-   이름 옆 알약으로 내 상태만 보여주고(주문 완료=초록, Skip=회색, 아직 안 함=주황),
-   내가 주문한 상태일 때만 빨간 ‘취소’ 버튼이 스트립에 보인다.
-   이름을 고르는 일은 이름 선택 팝업(#personModal)이 맡고, 팝업 안에는 취소 버튼을 두지 않는다 */
-function mySubmittedOrder(){
-  var found = null;
-  activeChannel().orders.forEach(function(o){
-    if (found) return;
-    var mine = o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName);
-    if (mine) found = o;
-  });
-  return found;
-}
+/* 이름 선택 카드 — 그룹 › 파트 조직도처럼 전원을 칩으로 전부 펼쳐 보여준다.
+   검색창도, 팝업도, 접기도, 내부 스크롤도 없이 카드 안에 그대로 나열한다.
+   각 칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시가 이름 옆에 붙는다.
+   칩을 누르면 그 사람이 나로 선택된다 (선택된 칩은 .sel로 표시된다).
+   내 상태 알약이나 취소 버튼은 두지 않는다 — 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서
+   제출된 주문마다 ‘삭제하고 장바구니에 다시 담기’로 한다 */
 function renderRoster(){
-  var nameEl = $("meBarName"); if (!nameEl) return;
+  var area = $("nameSelectArea"); if (!area) return;
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
   if ((ui.myName || ui.myKey) && !flat.some(function(p){ return ui.myKey ? p.key===ui.myKey : p.name===ui.myName; })){ ui.myName = ""; ui.myPart = ""; ui.myKey = ""; }
-  var pickBtn = $("mePickBtn"), changeBtn = $("meChangeBtn"), statusEl = $("meBarStatus"), cancelBtn = $("meCancelBtn");
-  function hideStatusAndCancel(){
-    if (statusEl){ statusEl.classList.add("hidden"); statusEl.textContent = ""; statusEl.className = "mestatus hidden"; }
-    if (cancelBtn) cancelBtn.classList.add("hidden");
-  }
   if (!flat.length){
-    nameEl.textContent = "아직 주문이 시작되지 않았어요";
-    pickBtn.classList.add("hidden"); changeBtn.classList.add("hidden");
-    hideStatusAndCancel();
-    updateSkipNote(); renderPersonList();
+    area.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong></div>';
+    updateSkipNote();
     return;
   }
-  if (ui.myName){
-    nameEl.innerHTML = "나: <b>" + esc(ui.myName) + "</b>";
-    pickBtn.classList.add("hidden"); changeBtn.classList.remove("hidden");
-    var st = personStatusP({ name: ui.myName, key: ui.myKey });
-    if (statusEl){
-      statusEl.classList.remove("hidden", "ordered", "skip", "pending");
-      statusEl.classList.add(st);
-      statusEl.textContent = st === "ordered" ? "주문 완료" : (st === "skip" ? "Skip" : "아직 안 함");
-    }
-    if (cancelBtn) cancelBtn.classList.toggle("hidden", st !== "ordered");
-  } else {
-    nameEl.textContent = "";
-    pickBtn.classList.remove("hidden"); changeBtn.classList.add("hidden");
-    hideStatusAndCancel();
-  }
-  updateSkipNote();
-  renderPersonList();
-}
-/* 이름 선택 팝업 — 그룹 › 파트로 묶인 명단을 한 줄씩 그린다. 팝업은 이름만 고르는 곳이라 취소 버튼은 두지 않는다.
-   주문했으면 주문한 메뉴를 초록으로, Skip이면 회색 Skip, 아직 안 했으면 주황 ‘아직 안 함’ */
-function personOrderSummary(o){
-  return o.items.map(function(it){ var s = itemSuffix(it); return it.name + (s ? "(" + s + ")" : "") + " ×" + it.qty; }).join(", ");
-}
-function renderPersonList(){
-  var list = $("personList"); if (!list) return;
-  var modal = $("personModal");
-  if (!modal || modal.classList.contains("hidden")) return;
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  var q = (ui.personQuery || "").trim().toLowerCase();
-  function rowHtml(n, pkey, fullTitle){
+  function chipHtml(n, pkey, fullTitle){
     var st = personStatusP({ name:n, key:pkey });
     var sel = pkey ? (ui.myKey === pkey) : (ui.myName === n && !ui.myKey);
-    var statusHtml;
-    if (st === "ordered"){
-      var o = pkey ? orderOfKey(pkey) : orderOf(n);
-      statusHtml = '<span class="pstat ordered">' + esc(o ? personOrderSummary(o) : "주문 완료") + "</span>";
-    } else if (st === "skip"){
-      statusHtml = '<span class="pstat skip">Skip</span>';
-    } else {
-      statusHtml = '<span class="pstat pending">아직 안 함</span>';
-    }
-    return '<div class="prow' + (sel ? " sel" : "") + '" role="button" tabindex="0" data-prow="' + esc(n) + '" data-ppart="' + esc(fullTitle) + '" data-pkey="' + esc(pkey) + '"><span class="pname">' + esc(n) + '</span><span class="pstat-wrap">' + statusHtml + "</span></div>";
+    var badge = st === "ordered" ? '<span class="st">주문 완료</span>' : (st === "skip" ? '<span class="st">Skip</span>' : "");
+    return '<button type="button" class="pchip' + (sel ? " sel" : "") + '" data-state="' + st + '" data-pname="' + esc(n) + '" data-ppart="' + esc(fullTitle) + '" data-pkey="' + esc(pkey) + '" aria-pressed="' + sel + '">' + esc(n) + badge + "</button>";
   }
-  function blockHtml(b, heading, fullTitleOf){
-    var rows = b.members.map(function(n, i){
-      if (q && n.toLowerCase().indexOf(q) < 0) return "";
-      return rowHtml(n, b.keys ? b.keys[i] : "", fullTitleOf);
-    }).join("");
-    if (!rows) return "";
-    return '<div class="partblock"><h3>' + esc(heading) + '</h3><div class="prows">' + rows + "</div></div>";
+  function blockHtml(b, heading, fullTitle){
+    if (!b.members.length) return "";
+    var chips = b.members.map(function(n, i){ return chipHtml(n, b.keys ? b.keys[i] : "", fullTitle); }).join("");
+    return '<div class="partblock"><h3>' + esc(heading) + '</h3><div class="pgrid">' + chips + "</div></div>";
   }
   var html = groupSections(blocks).map(function(sec){
     if (!sec.group) return blockHtml(sec.blocks[0], blockTitle(sec.blocks[0]), blockTitle(sec.blocks[0]));
@@ -4772,29 +4672,16 @@ function renderPersonList(){
     if (!inner) return "";
     return '<div class="roster-group"><div class="roster-group-head"><span class="gname">' + esc(sec.group) + '</span></div><div class="roster-group-body">' + inner + "</div></div>";
   }).join("");
-  list.innerHTML = html || '<div class="empty"><strong>검색 결과가 없어요</strong></div>';
-  Array.prototype.forEach.call(list.querySelectorAll("[data-prow]"), function(row){
-    function pick(){
-      ui.myName = row.getAttribute("data-prow");
-      ui.myPart = row.getAttribute("data-ppart");
-      ui.myKey = row.getAttribute("data-pkey") || "";
-      closePersonModal();
+  area.innerHTML = html || '<div class="empty"><strong>선택할 수 있는 이름이 없어요</strong></div>';
+  Array.prototype.forEach.call(area.querySelectorAll("[data-pname]"), function(chip){
+    chip.addEventListener("click", function(){
+      ui.myName = chip.getAttribute("data-pname");
+      ui.myPart = chip.getAttribute("data-ppart");
+      ui.myKey = chip.getAttribute("data-pkey") || "";
       renderRoster(); renderOrdersList();
-    }
-    row.addEventListener("click", pick);
-    row.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); } });
+    });
   });
-}
-function openPersonModal(){
-  var m = $("personModal"); if (!m) return;
-  ui.personQuery = "";
-  var s = $("personSearch"); if (s) s.value = "";
-  m.classList.remove("hidden"); _trackModalOpen("personModal");
-  renderPersonList();
-}
-function closePersonModal(fromPop){
-  var m = $("personModal"); if (!m || m.classList.contains("hidden")) return;
-  m.classList.add("hidden"); _trackModalClose("personModal", fromPop);
+  updateSkipNote();
 }
 
 /* 장바구니 키: ICE·HOT 둘 다인 메뉴는 온도별로 항목을 나눈다 (가격이 다를 수 있어서) */
@@ -5111,14 +4998,14 @@ function restoreOrderToCart(orderId){
 }
 /* 제출된 주문 내역 — 숫자 5칸 아래 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 한 묶음.
    기본 탭은 메뉴별 합계(#byMenu, renderSummary가 채운다)이고,
-   [내 메뉴]에는 내 제출분만(취소·되돌리기 버튼 포함),
+   [내 메뉴]에는 내 제출분만 — 내 주문 취소는 여기서 제출된 주문마다
+   ‘삭제하고 장바구니에 다시 담기’로 한다,
    [멤버 메뉴]에는 다른 사람별로 이름과 주문한 메뉴를 보여 준다 */
 function renderOrdersList(){
   var el = $("ordersList"), tabsEl = $("ordersTabs"), bmEl = $("byMenu");
   var tab = (ui.ordersTab === "mine" || ui.ordersTab === "members") ? ui.ordersTab : "bymenu";
   function isMine(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
-  var mineOrder = null;
-  activeChannel().orders.forEach(function(o){ if (!mineOrder && isMine(o)) mineOrder = o; });
+  var mineOrders = activeChannel().orders.filter(function(o){ return isMine(o); });
   if (tabsEl){
     tabsEl.innerHTML = '<button type="button" class="otab" role="tab" data-otab="bymenu" aria-selected="' + (tab === "bymenu") + '">메뉴별 합계</button>'
       + '<button type="button" class="otab" role="tab" data-otab="mine" aria-selected="' + (tab === "mine") + '">내 메뉴</button>'
@@ -5135,7 +5022,7 @@ function renderOrdersList(){
     return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span> <span class="tempbadge">' + esc(o.group) + "</span>"
       + '<div class="detail">' + detail + '</div></div>'
       + '<span class="amount">' + won(orderTotal(o)) + "</span>"
-      + (mine ? '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button><button type="button" class="btn small danger" data-delorder="' + esc(o.id) + '">내 주문 취소</button></div>' : "")
+      + (mine ? '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button></div>' : "")
       + "</div>";
   }
   if (ui.ordersTab === "members"){
@@ -5151,17 +5038,11 @@ function renderOrdersList(){
     el.innerHTML = '<div class="empty"><strong>이름을 선택하면 내 주문이 보여요</strong></div>';
     return;
   }
-  if (!mineOrder){
+  if (!mineOrders.length){
     el.innerHTML = '<div class="empty"><strong>아직 제출한 주문이 없어요</strong></div>';
     return;
   }
-  el.innerHTML = rowHtml(mineOrder, true);
-  Array.prototype.forEach.call(el.querySelectorAll("[data-delorder]"), function(b){
-    b.addEventListener("click", function(){
-      dropOrderById(activeChannel(), b.getAttribute("data-delorder"));
-      touch(); toast("주문을 취소했어요.");
-    });
-  });
+  el.innerHTML = mineOrders.slice().reverse().map(function(o){ return rowHtml(o, true); }).join("");
   Array.prototype.forEach.call(el.querySelectorAll("[data-restoreorder]"), function(b){
     b.addEventListener("click", function(){
       restoreOrderToCart(b.getAttribute("data-restoreorder"));
@@ -6644,18 +6525,8 @@ $("channelCancelBtn").addEventListener("click", function(){ closeChannelModal(tr
 $("channelModalCloseBtn").addEventListener("click", function(){ closeChannelModal(true); });
 $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModal(true); });
 
-/* 이름 선택 팝업 (A안) — ‘나를 선택해 주세요’·‘변경’이 같은 팝업을 연다. 팝업은 이름만 고르는 곳이다 */
-$("mePickBtn").addEventListener("click", function(){ openPersonModal(); });
-$("meChangeBtn").addEventListener("click", function(){ openPersonModal(); });
-/* 스트립의 ‘취소’ — 내가 주문한 상태일 때만 보인다. 누르면 내 제출된 주문이 취소되고 메뉴가 장바구니로 돌아간다 */
-$("meCancelBtn").addEventListener("click", function(){
-  var o = mySubmittedOrder();
-  if (!o) return;
-  restoreOrderToCart(o.id);
-});
-$("personModalCloseBtn").addEventListener("click", function(){ closePersonModal(); });
-$("personModalBackdrop").addEventListener("click", function(){ closePersonModal(); });
-$("personSearch").addEventListener("input", function(){ ui.personQuery = this.value; renderPersonList(); });
+/* 이름 선택은 ‘이름 선택’ 카드의 칩이 맡는다 — 칩 클릭 연결은 renderRoster가 그릴 때마다 붙인다.
+   팝업·스트립·취소 버튼은 없다. 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서 한다 */
 
 /* 본인 Skip (주문 화면에서 각자) */
 $("skipBtn").addEventListener("click", function(){
@@ -6990,8 +6861,6 @@ document.addEventListener("keydown", function(e){
   if (stm && !stm.classList.contains("hidden")){ closeStoresModal(); return; }
   var ptm = $("partsModal");
   if (ptm && !ptm.classList.contains("hidden")){ closePartsModal(); return; }
-  var pm2 = $("personModal");
-  if (pm2 && !pm2.classList.contains("hidden")){ closePersonModal(); }
 });
 $("openNewMenuBtn").addEventListener("click", function(){
   if (!state.stores.length){ toast("먼저 가게를 추가하세요."); return; }
