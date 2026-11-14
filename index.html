@@ -4722,6 +4722,41 @@ function cartBreakdown(menuId){
   Object.keys(ui.cart).forEach(function(k){ var c = ui.cart[k]; if (c && c.menuId === menuId && c.qty > 0){ var s = itemSuffix(c); bits.push((s ? s + " " : "") + "×" + c.qty + " (" + won(c.price * c.qty) + ")"); } });
   return bits.join(" · ");
 }
+/* 메뉴 행 높이 기준 — 전체 메뉴(필터 안 건 상태)에서 가장 높은 행의 높이.
+   카테고리·검색 필터가 바뀔 때마다 보이는 행만으로 다시 재지 않는다:
+   기준은 가게·메뉴 구성, 채널 제한, 장바구니 상태, 목록 폭이 바뀔 때만
+   전체 메뉴를 기준으로 새로 정하고, 그 사이 필터 변경에는 그대로 유지한다 */
+var _menuRowBase = { key:"", h:0, w:0 };
+function menuRowBaseKey(rs){
+  var s = "";
+  rs.menus.forEach(function(m){ s += m.id + "|" + (m.name || "") + "|" + priceText(m) + "|" + (m.tempType || "") + ";"; });
+  var h = 0; for (var i = 0; i < s.length; i++){ h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+  return String(rs.id || rs.name || "") + "|" + rs.menus.length + "|" + h;
+}
+/* 지금 화면에 보이는 행이 아니라 전체 메뉴의 모든 행을 같은 폭으로 몰래 렌더링해
+   가장 높은 행을 기준 높이로 삼고, 보이는 모든 행에 그 높이를 최소 높이로 고정한다.
+   메뉴 이름·가격 글자 길이가 행마다 달라도 높이가 하나로 맞춰져,
+   카테고리를 누르거나 검색어를 입력해도 행 높이가 바뀌어 출렁이지 않는다 */
+function fixMenuRowHeights(rs, area, cardFn, fp){
+  if (!rs || !rs.menus || !rs.menus.length || !area) return;
+  var w = area.clientWidth;
+  if (!w) return;
+  var key = menuRowBaseKey(rs) + "|" + (fp || "") + "|" + w;
+  if (_menuRowBase.key !== key || !_menuRowBase.h){
+    var probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = "position:absolute;left:0;top:0;visibility:hidden;pointer-events:none;width:" + w + "px";
+    probe.innerHTML = '<div class="menulist">' + rs.menus.map(cardFn).join("") + "</div>";
+    (area.parentNode || document.body).appendChild(probe);
+    var max = 0;
+    Array.prototype.forEach.call(probe.querySelectorAll(".mrow"), function(r){ if (r.offsetHeight > max) max = r.offsetHeight; });
+    if (probe.parentNode) probe.parentNode.removeChild(probe);
+    if (max > 0) _menuRowBase = { key:key, h:max, w:w };
+  }
+  if (_menuRowBase.h){
+    Array.prototype.forEach.call(area.querySelectorAll(".mrow"), function(r){ r.style.minHeight = _menuRowBase.h + "px"; });
+  }
+}
 function renderMenuArea(){
   var rs = roundStore(), area = $("menuArea");
   $("menuHead").textContent = rs ? (rs.name + " 메뉴") : "메뉴 고르기";
@@ -4844,6 +4879,12 @@ function renderMenuArea(){
   } else {
     area.innerHTML = '<div class="menulist">' + menus.map(menuCard).join("") + "</div>";
   }
+  /* 행 높이를 전체 메뉴 기준 가장 높은 행에 고정한다 — 필터로 보이는 행만으로
+     다시 재지 않으므로 카테고리·검색을 바꿔도 기준 높이는 그대로 유지된다.
+     지문(fp)은 제한·장바구니처럼 행 높이에 영향을 주는 상태가 바뀔 때만 달라진다 */
+  var rowFp = Object.keys(lim.cats).sort().map(function(k){ return k + ":" + lim.cats[k]; }).join(",")
+    + "#" + Object.keys(ui.cart || {}).sort().join(",");
+  fixMenuRowHeights(rs, area, menuCard, rowFp);
   Array.prototype.forEach.call(area.querySelectorAll("[data-temp]"), function(b){
     b.addEventListener("click", function(){
       var parts = b.getAttribute("data-temp").split("|"); ui.tempSel[parts[0]] = parts[1];
@@ -6617,6 +6658,17 @@ $("cartClearBtn").addEventListener("click", function(){ ui.cart = {}; renderMenu
 /* 메뉴 검색 입력 — 검색 칸은 메뉴 목록(#menuArea) 밖에 있어 다시 그려도 입력값과 포커스가 유지된다 */
 var _menuSearchEl = $("menuSearch");
 if (_menuSearchEl) _menuSearchEl.addEventListener("input", function(){ ui.menuQuery = _menuSearchEl.value; renderMenuArea(); });
+/* 화면 너비가 바뀌면 글자 줄바꿈이 달라져 행 높이 기준도 달라진다 —
+   그때만 전체 메뉴 기준으로 기준 높이를 새로 재도록 목록을 다시 그린다.
+   카테고리·검색 변경은 너비를 바꾸지 않으므로 이 경로를 타지 않는다 */
+var _menuResizeT = null;
+window.addEventListener("resize", function(){
+  if (_menuResizeT) clearTimeout(_menuResizeT);
+  _menuResizeT = setTimeout(function(){
+    var area = $("menuArea");
+    if (area && area.clientWidth && _menuRowBase.w && area.clientWidth !== _menuRowBase.w) renderMenuArea();
+  }, 180);
+});
 var _mcbBtn = $("mobileCartBtn");
 if (_mcbBtn) _mcbBtn.addEventListener("click", function(){ var cc = $("cartCard"); if (cc) cc.scrollIntoView({ behavior:"smooth", block:"center" }); });
 
