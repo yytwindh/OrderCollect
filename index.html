@@ -4965,35 +4965,76 @@ function cartCatQty(cat){
 function cartTotalPrice(){
   return cartItems().reduce(function(a, it){ return a + it.price * it.qty; }, 0);
 }
-/* 채널 제한 검사: 담으려는 수량까지 포함해 구분별 최대 수량·1인 금액을 넘는지 본다. 통과하면 "" */
+/* 이미 제출한 내 주문 항목들 — 인당 제한은 장바구니만이 아니라
+   ‘이미 제출한 주문 + 지금 장바구니’를 합쳐서 봐야 한다.
+   제출할 때마다 장바구니만 검사하면 제한 이하로 나눠서 무한히 추가 주문할 수 있었다 */
+function mySubmittedItems(){
+  if (!ui.myName && !ui.myKey) return [];
+  var out = [];
+  (activeChannel().orders || []).forEach(function(o){
+    if (isMineOrder(o)) (o.items || []).forEach(function(it){ out.push(it); });
+  });
+  return out;
+}
+function mySubmittedTotal(){
+  return mySubmittedItems().reduce(function(a, it){ return a + (Number(it.price) || 0) * (Number(it.qty) || 0); }, 0);
+}
+/* 제출된 항목의 구분 — 예전 주문에는 구분(cat)이 비어 있을 수 있어 메뉴 이름으로 다시 찾는다 */
+function submittedItemCat(it){
+  if (it.cat) return it.cat;
+  var rs = roundStore(); if (!rs || !Array.isArray(rs.menus)) return "";
+  for (var i = 0; i < rs.menus.length; i++){ if (rs.menus[i].name === it.name) return menuCat(rs.menus[i]); }
+  return "";
+}
+function mySubmittedCatQty(cat){
+  return mySubmittedItems().reduce(function(a, it){ return a + (submittedItemCat(it) === cat ? (Number(it.qty) || 0) : 0); }, 0);
+}
+/* 채널 제한 검사: 이미 제출한 내 주문 + 장바구니 + 담으려는 수량까지 합쳐
+   구분별 최대 수량·1인 금액을 넘는지 본다. 통과하면 "" */
 function limitViolation(menu, addQty, unitPrice){
   var lim = sanitizeLimits(activeChannel().limits);
   var cat = menuCat(menu);
-  if ((cat in lim.cats) && cartCatQty(cat) + addQty > lim.cats[cat]){
-    return lim.cats[cat] === 0
-      ? ("이번 주문에서는 " + cat + josa(cat, "을", "를") + " 주문할 수 없어요.")
-      : (cat + josa(cat, "은", "는") + " 최대 " + lim.cats[cat] + "개까지만 담을 수 있어요. (지금 " + cartCatQty(cat) + "개 담김)");
+  if (cat in lim.cats){
+    var subQty = mySubmittedCatQty(cat), cartQty = cartCatQty(cat);
+    if (subQty + cartQty + addQty > lim.cats[cat]){
+      if (lim.cats[cat] === 0) return "이번 주문에서는 " + cat + josa(cat, "을", "를") + " 주문할 수 없어요.";
+      return cat + josa(cat, "은", "는") + " 최대 " + lim.cats[cat] + "개까지만 담을 수 있어요. ("
+        + (subQty > 0 ? "이미 주문 " + subQty + "개 + 장바구니 " + cartQty + "개" : "지금 " + cartQty + "개 담김") + ")";
+    }
   }
-  if (lim.maxPrice && cartTotalPrice() + (unitPrice != null ? unitPrice : priceFor(menu, tempLabel(menu, ui.tempSel[menu.id]))) * addQty > lim.maxPrice){
-    return "1인 최대 " + won(lim.maxPrice) + "까지만 담을 수 있어요. (지금 " + won(cartTotalPrice()) + ")";
+  if (lim.maxPrice){
+    var subTot = mySubmittedTotal(), cartTot = cartTotalPrice();
+    var addPrice = (unitPrice != null ? unitPrice : priceFor(menu, tempLabel(menu, ui.tempSel[menu.id]))) * addQty;
+    if (subTot + cartTot + addPrice > lim.maxPrice){
+      return "1인 최대 " + won(lim.maxPrice) + "까지만 담을 수 있어요. ("
+        + (subTot > 0 ? "이미 주문 " + won(subTot) + " + 장바구니 " + won(cartTot) : "지금 " + won(cartTot)) + ")";
+    }
   }
   return "";
 }
-/* 장바구니 전체를 현재 채널 제한으로 다시 검사한다 (제한이 바뀐 경우 제출 직전 확인용) */
+/* 제출 직전 검사: 이미 제출한 내 주문과 장바구니를 합친 합계가 현재 채널 제한을 넘는지 본다 */
 function cartViolation(){
   var lim = sanitizeLimits(activeChannel().limits), byCat = {};
+  mySubmittedItems().forEach(function(it){
+    var c = submittedItemCat(it);
+    if (c) byCat[c] = (byCat[c] || 0) + (Number(it.qty) || 0);
+  });
   var items = cartItems();
   for (var i = 0; i < items.length; i++){
     var it = items[i];
     byCat[it.cat] = (byCat[it.cat] || 0) + it.qty;
-    if ((it.cat in lim.cats) && byCat[it.cat] > lim.cats[it.cat]){
-      return lim.cats[it.cat] === 0
-        ? ("이번 주문에서는 " + it.cat + josa(it.cat, "을", "를") + " 주문할 수 없어요. 장바구니에서 빼 주세요.")
-        : (it.cat + josa(it.cat, "은", "는") + " 최대 " + lim.cats[it.cat] + "개까지만 주문할 수 있어요. 장바구니를 줄여 주세요.");
+  }
+  for (var cat in byCat){
+    if ((cat in lim.cats) && byCat[cat] > lim.cats[cat]){
+      return lim.cats[cat] === 0
+        ? ("이번 주문에서는 " + cat + josa(cat, "을", "를") + " 주문할 수 없어요. 장바구니에서 빼 주세요.")
+        : (cat + josa(cat, "은", "는") + " 최대 " + lim.cats[cat] + "개까지만 주문할 수 있어요. 이미 주문한 것과 장바구니를 합쳐 " + byCat[cat] + "개예요. 장바구니를 줄여 주세요.");
     }
   }
-  if (lim.maxPrice && cartTotalPrice() > lim.maxPrice){
-    return "1인 최대 " + won(lim.maxPrice) + "까지만 주문할 수 있어요. (지금 " + won(cartTotalPrice()) + ")";
+  var subTot2 = mySubmittedTotal(), cartTot2 = cartTotalPrice();
+  if (lim.maxPrice && subTot2 + cartTot2 > lim.maxPrice){
+    return "1인 최대 " + won(lim.maxPrice) + "까지만 주문할 수 있어요. ("
+      + (subTot2 > 0 ? "이미 주문 " + won(subTot2) + " + 장바구니 " + won(cartTot2) : "지금 " + won(cartTot2)) + ")";
   }
   return "";
 }
@@ -5053,11 +5094,19 @@ function renderCart(){
   if (hasLimits(activeChannel().limits)){
     var qtyBits = [];
     Object.keys(lim.cats).forEach(function(c){
-      qtyBits.push(c + " " + cartCatQty(c) + "/" + lim.cats[c] + "개");
+      qtyBits.push(c + " " + (mySubmittedCatQty(c) + cartCatQty(c)) + "/" + lim.cats[c] + "개");
     });
     var noteLines = [];
     if (qtyBits.length) noteLines.push("수량 제한 — " + esc(qtyBits.join(" · ")));
-    if (lim.maxPrice) noteLines.push("금액 제한 — " + esc(won(tot) + " / " + won(lim.maxPrice) + (tot < lim.maxPrice ? " · " + won(lim.maxPrice - tot) + " 남음" : "")));
+    if (lim.maxPrice){
+      /* 금액 제한은 이미 제출한 주문까지 합친 금액으로 보여준다 — 그래야 남은 금액이 실제와 맞는다 */
+      var subTot = mySubmittedTotal(), combined = subTot + tot;
+      var priceNote = subTot > 0
+        ? "이미 주문 " + won(subTot) + " + 장바구니 " + won(tot) + " = " + won(combined) + " / " + won(lim.maxPrice)
+        : won(tot) + " / " + won(lim.maxPrice);
+      if (combined < lim.maxPrice) priceNote += " · " + won(lim.maxPrice - combined) + " 남음";
+      noteLines.push("금액 제한 — " + esc(priceNote));
+    }
     note.innerHTML = noteLines.join("<br />");
     note.classList.remove("hidden");
   } else {
@@ -5587,7 +5636,7 @@ function renderSetupLimits(d){
     + "</div>"
     + '<div class="limitgroup"><div class="limitgroup-title">금액 제한<span>구분 상관없이 총액 기준</span></div>'
     + '<div class="limitrows">' + priceRow + "</div>"
-    + '<p class="hint">비우면 무제한이에요.<br />예: 9000을 넣으면 9,000원을 넘겨 담을 수 없어요.</p></div>';
+    + '<p class="hint">비우면 무제한이에요.<br />예: 9000을 넣으면 이미 제출한 주문과 장바구니를 합쳐 9,000원을 넘겨 담을 수 없어요.</p></div>';
   Array.prototype.forEach.call(wrap.querySelectorAll("[data-limit-cat]"), function(inp){
     inp.addEventListener("input", function(){
       var c = inp.getAttribute("data-limit-cat"), raw = inp.value.trim();
