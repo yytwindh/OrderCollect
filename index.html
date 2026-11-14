@@ -1758,6 +1758,266 @@ function builtinMenuKey(specId, menuName){ return specId + ":" + menuName; }
 function builtinMenuRemoved(d, specId, menuName){
   return !!d && Array.isArray(d.removedBuiltinMenus) && d.removedBuiltinMenus.indexOf(builtinMenuKey(specId, menuName)) >= 0;
 }
+/* ---------- 메뉴 오버라이드 (사용자 변경 레이어) ----------
+   기본 내장 메뉴(BUILTIN_STORE_SPECS)는 ‘베이스’일 뿐이고, 사용자가 바꾼 내용은
+   state.menuOverrides에 별도로 저장해 Firestore 메타 델타로 함께 동기화한다.
+   병합 규칙: 베이스에서 삭제된 항목을 빼고, 숨긴 항목은 주문 화면에서만 빼고,
+   가격 수정을 적용한 뒤, 추가한 항목을 합친다. 새 BUILTIN_VERSION이 와서
+   refreshBuiltinStore가 베이스를 스펙으로 되돌려도, 그 위에 이 오버라이드를
+   다시 적용하므로 사용자가 지운 메뉴가 부활하거나 바꾼 가격이 날아가지 않는다.
+   구조: { [가게 스펙 id]: {
+     added:    [메뉴 전체 레코드, …],               // (1) 사용자가 추가한 메뉴
+     hidden:   ["이름|카테고리", …],                 // (2) 숨긴 메뉴 — 주문 화면에서만 안 보임
+     deleted:  ["이름|카테고리", …],                 // (3) 삭제한 메뉴 — 완전히 제거
+     priceMods:{ "이름|카테고리": {price, priceIce, priceHot, updatedAt} }  // (4) 바꾼 가격
+   } }
+   키는 메뉴 동일성 기준과 같은 (이름+카테고리)다 — 같은 이름이 두 카테고리에
+   나란히 있는 메뉴(스타벅스 ‘K-에그 바이트’ 등)를 따로 가릴 수 있어야 하기 때문이다.
+   기존 삭제 기록(removedBuiltinMenus, "가게id:메뉴이름")은 그대로 호환된다:
+   아래 판정에서 이름 기준 기록도 삭제 사유로 함께 인정한다. 새 삭제는 두 곳에
+   다 남긴다(오버라이드에는 정확한 키로, 기존 기록에는 이름으로 — 옛 버전 화면과
+   이름 기준 가드들이 계속 막아 주게). 다섯 사내 입점 매장 모두 같은 규칙을 쓴다 */
+function cloneMenuRecord(m){ try { return JSON.parse(JSON.stringify(m)); } catch(e){ return null; } }
+function sanitizeOverrideMenu(m){
+  if (!m || typeof m !== "object" || typeof m.name !== "string" || !m.name.trim()) return null;
+  var price = Number(m.price);
+  if (isNaN(price) || price < 0) return null;
+  function numOrNull(v){ if (v == null) return null; var n = Number(v); return isNaN(n) || n < 0 ? null : n; }
+  var out = { id: typeof m.id === "string" && m.id ? m.id : uid("menu"),
+    name: m.name.trim(), price: price, priceIce: numOrNull(m.priceIce), priceHot: numOrNull(m.priceHot),
+    tempType: ["both","ice","hot","none"].indexOf(m.tempType) >= 0 ? m.tempType : "both",
+    cat: typeof m.cat === "string" && m.cat.trim() ? m.cat.trim() : "음료" };
+  if (m.opt && typeof m.opt === "object") out.opt = { sweet: !!m.opt.sweet, ice: !!m.opt.ice, toppings: !!m.opt.toppings };
+  if (Array.isArray(m.sizes)){
+    var szs = m.sizes.filter(function(s){ return s && s.label && !isNaN(Number(s.price)); })
+      .map(function(s){ var o = { label: String(s.label), price: Number(s.price) }; if (s.only === "hot" || s.only === "ice") o.only = s.only; return o; });
+    if (szs.length) out.sizes = szs;
+  }
+  if (Array.isArray(m.beans)){
+    var bns = m.beans.filter(function(b){ return b && b.label && !isNaN(Number(b.add)); })
+      .map(function(b){ return { label: String(b.label), add: Number(b.add) }; });
+    if (bns.length) out.beans = bns;
+  }
+  if (typeof m.mts === "number") out.mts = m.mts;
+  return out;
+}
+function emptyStoreOverride(){ return { added:[], hidden:[], deleted:[], priceMods:{} }; }
+function sanitizeStoreOverride(raw){
+  var out = emptyStoreOverride();
+  if (!raw || typeof raw !== "object") return out;
+  function keyList(v){
+    var res = [];
+    (Array.isArray(v) ? v : []).forEach(function(k){
+      if (typeof k === "string" && k.indexOf("|") > 0 && res.indexOf(k) < 0) res.push(k);
+    });
+    return res;
+  }
+  out.hidden = keyList(raw.hidden);
+  out.deleted = keyList(raw.deleted);
+  (Array.isArray(raw.added) ? raw.added : []).forEach(function(m){
+    var sm = sanitizeOverrideMenu(m);
+    if (sm && !out.added.some(function(x){ return menuIdentityKey(x) === menuIdentityKey(sm); })) out.added.push(sm);
+  });
+  if (raw.priceMods && typeof raw.priceMods === "object"){
+    Object.keys(raw.priceMods).forEach(function(k){
+      var pm = raw.priceMods[k];
+      if (typeof k !== "string" || k.indexOf("|") <= 0 || !pm || typeof pm !== "object") return;
+      var price = Number(pm.price);
+      if (isNaN(price) || price < 0) return;
+      function nn(v){ if (v == null) return null; var n = Number(v); return isNaN(n) || n < 0 ? null : n; }
+      out.priceMods[k] = { price: price, priceIce: nn(pm.priceIce), priceHot: nn(pm.priceHot),
+        updatedAt: typeof pm.updatedAt === "number" ? pm.updatedAt : 0 };
+    });
+  }
+  return out;
+}
+function sanitizeMenuOverrides(raw){
+  var out = {};
+  if (!raw || typeof raw !== "object") return out;
+  BUILTIN_STORE_SPECS.forEach(function(spec){
+    if (!raw[spec.id]) return;
+    var so = sanitizeStoreOverride(raw[spec.id]);
+    if (so.added.length || so.hidden.length || so.deleted.length || Object.keys(so.priceMods).length) out[spec.id] = so;
+  });
+  return out;
+}
+function menuOverridesHasContent(ov){
+  if (!ov || typeof ov !== "object") return false;
+  return Object.keys(ov).some(function(sid){
+    var s = ov[sid];
+    return !!s && ((s.added || []).length || (s.hidden || []).length || (s.deleted || []).length || Object.keys(s.priceMods || {}).length);
+  });
+}
+function ensureStoreOverride(d, specId){
+  if (!d.menuOverrides || typeof d.menuOverrides !== "object") d.menuOverrides = {};
+  if (!d.menuOverrides[specId]) d.menuOverrides[specId] = emptyStoreOverride();
+  return d.menuOverrides[specId];
+}
+function storeOverrideOf(d, specId){
+  return (d && d.menuOverrides && d.menuOverrides[specId]) || null;
+}
+/* 오버라이드 삭제 판정 — 정확한 (이름+카테고리) 키가 1차 기준이고,
+   기존 이름 기준 삭제 기록(removedBuiltinMenus)도 함께 인정한다(호환 유지) */
+function isMenuOverrideDeleted(d, spec, menu){
+  if (!d || !spec || !menu) return false;
+  var ov = storeOverrideOf(d, spec.id);
+  if (ov && ov.deleted.indexOf(menuIdentityKey(menu)) >= 0) return true;
+  return builtinMenuRemoved(d, spec.id, menu.name);
+}
+function isMenuOverrideHidden(d, spec, menu){
+  if (!d || !spec || !menu) return false;
+  var ov = storeOverrideOf(d, spec.id);
+  return !!ov && ov.hidden.indexOf(menuIdentityKey(menu)) >= 0;
+}
+function recordMenuOverrideDeleted(d, spec, menu){
+  if (!d || !spec || !menu) return;
+  var ov = ensureStoreOverride(d, spec.id), key = menuIdentityKey(menu);
+  if (ov.deleted.indexOf(key) < 0) ov.deleted.push(key);
+  ov.hidden = ov.hidden.filter(function(k){ return k !== key; });
+  ov.added = ov.added.filter(function(m){ return menuIdentityKey(m) !== key; });
+  delete ov.priceMods[key];
+}
+function upsertMenuOverrideAdded(d, spec, menu){
+  if (!d || !spec || !menu) return;
+  var sm = sanitizeOverrideMenu(menu); if (!sm) return;
+  var ov = ensureStoreOverride(d, spec.id), key = menuIdentityKey(sm);
+  ov.deleted = ov.deleted.filter(function(k){ return k !== key; });
+  ov.hidden = ov.hidden.filter(function(k){ return k !== key; });
+  delete ov.priceMods[key]; /* 추가 레코드가 가격까지 들고 있으므로 가격 수정 기록은 따로 두지 않는다 */
+  var idx = -1;
+  ov.added.forEach(function(m, i){ if (menuIdentityKey(m) === key) idx = i; });
+  if (idx >= 0) ov.added[idx] = sm; else ov.added.push(sm);
+}
+/* 메뉴 편집 저장 때 부른다 — 옛 스냅샷(oldSnap)과 저장 뒤 메뉴(newMenu)를 비교해
+   오버라이드에 반영한다. 이름·카테고리가 바뀌면 옛 항목 삭제 + 새 항목 추가로,
+   스펙 메뉴의 가격만 바뀌면 가격 수정으로, 추가 메뉴의 변경은 레코드 교체로 남긴다 */
+function captureMenuEditOverride(d, store, oldSnap, newMenu){
+  var spec = builtinSpecFor(store);
+  if (!spec || !oldSnap || !newMenu) return;
+  var ov = ensureStoreOverride(d, spec.id);
+  var oldKey = menuIdentityKey(oldSnap), newKey = menuIdentityKey(newMenu);
+  if (oldKey !== newKey){
+    recordMenuOverrideDeleted(d, spec, oldSnap);
+    upsertMenuOverrideAdded(d, spec, newMenu);
+    return;
+  }
+  if (ov.added.some(function(m){ return menuIdentityKey(m) === oldKey; })){
+    upsertMenuOverrideAdded(d, spec, newMenu);
+    return;
+  }
+  if (builtinSpecKeySet(spec)[oldKey]){
+    var fresh = null;
+    buildBuiltinStore(spec).menus.forEach(function(m){ if (menuIdentityKey(m) === oldKey) fresh = m; });
+    if (fresh && Number(newMenu.price) === Number(fresh.price)
+      && (newMenu.priceIce == null ? null : Number(newMenu.priceIce)) === (fresh.priceIce == null ? null : Number(fresh.priceIce))
+      && (newMenu.priceHot == null ? null : Number(newMenu.priceHot)) === (fresh.priceHot == null ? null : Number(fresh.priceHot))){
+      delete ov.priceMods[oldKey]; /* 스펙 가격으로 되돌리면 가격 수정 기록도 지운다 */
+    } else {
+      ov.priceMods[oldKey] = { price: Number(newMenu.price),
+        priceIce: newMenu.priceIce == null ? null : Number(newMenu.priceIce),
+        priceHot: newMenu.priceHot == null ? null : Number(newMenu.priceHot),
+        updatedAt: Date.now() };
+    }
+    return;
+  }
+  upsertMenuOverrideAdded(d, spec, newMenu);
+}
+/* 카테고리 이름이 바뀌면 오버라이드 키(이름|카테고리)의 카테고리 부분도 함께 옮긴다 */
+function migrateMenuOverrideCat(d, specId, oldCat, newCat){
+  var ov = storeOverrideOf(d, specId); if (!ov) return;
+  function mv(k){ var i = k.lastIndexOf("|"); return i >= 0 && k.slice(i + 1) === oldCat ? k.slice(0, i + 1) + newCat : k; }
+  ov.hidden = ov.hidden.map(mv); ov.deleted = ov.deleted.map(mv);
+  var pm = {};
+  Object.keys(ov.priceMods).forEach(function(k){ pm[mv(k)] = ov.priceMods[k]; });
+  ov.priceMods = pm;
+  ov.added.forEach(function(m){ if (menuCat(m) === oldCat) m.cat = newCat; });
+}
+/* 오버라이드 이전에 사용자가 이미 바꿔 둔 내용을 레이어로 끌어올린다(백필):
+   스펙에 없는 사용자 메뉴(uid id)는 추가 레코드로, 스펙과 가격이 다른 메뉴는
+   가격 수정으로 등록한다. 이미 오버라이드에 있는 항목은 건드리지 않으므로
+   멱등하고, 삭제된 메뉴는 메뉴판에 없어 백필 대상이 되지 않는다 */
+function backfillMenuOverrides(d, store, spec){
+  if (!d || !store || !spec || !Array.isArray(store.menus)) return;
+  var byKey = {};
+  buildBuiltinStore(spec).menus.forEach(function(m){ byKey[menuIdentityKey(m)] = m; });
+  store.menus.forEach(function(m){
+    if (!m) return;
+    var k = menuIdentityKey(m), f = byKey[k];
+    var ov = storeOverrideOf(d, spec.id);
+    if (f){
+      if (ov && ov.priceMods[k]) return;
+      if (Number(m.price) !== Number(f.price)
+        || (m.priceIce == null ? null : Number(m.priceIce)) !== (f.priceIce == null ? null : Number(f.priceIce))
+        || (m.priceHot == null ? null : Number(m.priceHot)) !== (f.priceHot == null ? null : Number(f.priceHot))){
+        ensureStoreOverride(d, spec.id).priceMods[k] = { price: Number(m.price),
+          priceIce: m.priceIce == null ? null : Number(m.priceIce),
+          priceHot: m.priceHot == null ? null : Number(m.priceHot),
+          updatedAt: typeof m.mts === "number" ? m.mts : 0 };
+      }
+    } else if (!isBuiltinMenuId(spec.id, m.id)){
+      if (ov && ov.added.some(function(x){ return menuIdentityKey(x) === k; })) return;
+      upsertMenuOverrideAdded(d, spec, m);
+    }
+  });
+}
+/* 병합 본체: 베이스(가게 메뉴판) 위에 오버라이드를 적용해 메뉴판을 수렴시킨다.
+   순서 — ① 삭제 제거 → ② 빠진 스펙 메뉴 보충(삭제 기록이 없을 때만) →
+   ③ 가격 수정 적용 → ④ 추가 메뉴 병합. 숨김은 여기서 빼지 않는다:
+   데이터는 메뉴판에 그대로 남고, 주문 화면(visibleMenusForOrder)에서만 가린다 */
+function applyMenuOverridesToStore(store, spec, d){
+  if (!store || !spec || !d || !Array.isArray(store.menus)) return;
+  var ov = storeOverrideOf(d, spec.id);
+  var deleted = ov ? ov.deleted : [], priceMods = ov ? ov.priceMods : {}, added = ov ? ov.added : [];
+  store.menus = store.menus.filter(function(m){ return m && !isMenuOverrideDeleted(d, spec, m); });
+  var fresh = buildBuiltinStore(spec), present = {};
+  store.menus.forEach(function(m){ present[menuIdentityKey(m)] = 1; });
+  fresh.menus.forEach(function(fm){
+    var k = menuIdentityKey(fm);
+    if (present[k] || deleted.indexOf(k) >= 0 || builtinMenuRemoved(d, spec.id, fm.name)) return;
+    var c = cloneMenuRecord(fm); if (c){ store.menus.push(c); present[k] = 1; }
+  });
+  store.menus.forEach(function(m){
+    var pm = priceMods[menuIdentityKey(m)]; if (!pm) return;
+    m.price = pm.price; m.priceIce = pm.priceIce; m.priceHot = pm.priceHot;
+  });
+  added.forEach(function(rec){
+    if (!rec || isMenuOverrideDeleted(d, spec, rec)) return;
+    var sm = sanitizeOverrideMenu(rec); if (!sm) return;
+    var k = menuIdentityKey(sm), idx = -1;
+    store.menus.forEach(function(m, i){ if (menuIdentityKey(m) === k) idx = i; });
+    if (idx >= 0){ var keepId = store.menus[idx].id; store.menus[idx] = sm; if (keepId) store.menus[idx].id = keepId; }
+    else store.menus.push(sm);
+  });
+  if (!Array.isArray(store.categories)) store.categories = [];
+  fresh.categories.forEach(function(c){ if (store.categories.indexOf(c) < 0) store.categories.push(c); });
+  store.menus.forEach(function(m){ var c = menuCat(m); if (store.categories.indexOf(c) < 0) store.categories.push(c); });
+}
+/* 스냅샷 병합용 오버라이드 병합 — 메타 mts가 다르면 승자 쪽을 통째로 따르고(숨김
+   해제가 옛 스냅샷 때문에 되살아나지 않게), 동률이면 삭제·숨김·추가는 합집합,
+   가격 수정은 승자 우선에 없는 키만 채운다 */
+function mergeMenuOverridesForSnap(L, R, equalMts, preferR){
+  var win = sanitizeMenuOverrides(preferR ? R : L), other = sanitizeMenuOverrides(preferR ? L : R);
+  if (!equalMts) return win;
+  Object.keys(other).forEach(function(sid){
+    if (!win[sid]){ win[sid] = other[sid]; return; }
+    var w = win[sid], o = other[sid];
+    o.deleted.forEach(function(k){ if (w.deleted.indexOf(k) < 0) w.deleted.push(k); });
+    o.hidden.forEach(function(k){ if (w.hidden.indexOf(k) < 0) w.hidden.push(k); });
+    o.added.forEach(function(m){
+      if (!w.added.some(function(x){ return menuIdentityKey(x) === menuIdentityKey(m); })) w.added.push(m);
+    });
+    Object.keys(o.priceMods).forEach(function(k){ if (!w.priceMods[k]) w.priceMods[k] = o.priceMods[k]; });
+  });
+  return win;
+}
+/* 주문 화면에 보일 메뉴 — 숨긴 메뉴만 걸러 낸다 (삭제는 이미 메뉴판에서 빠졌고,
+   숨김은 데이터가 남아 있어 관리 목록·장바구니 정합에는 그대로 쓰인다) */
+function visibleMenusForOrder(store){
+  if (!store || !Array.isArray(store.menus)) return [];
+  var spec = builtinSpecFor(store);
+  if (!spec) return store.menus.slice();
+  return store.menus.filter(function(m){ return !isMenuOverrideHidden(state, spec, m); });
+}
 /* 메뉴의 동일성은 내부 id가 아니라 (이름+카테고리)로 본다. 기본 메뉴 id는 예전에 스펙 순서로
    매겨져서(…-m12) 스펙을 전면 교체할 때마다 같은 id가 다른 메뉴를 가리키게 됐고(17부터는
    이름+카테고리 기반 안정 id로 교체),
@@ -1806,6 +2066,7 @@ function pruneBuiltinStoreMenus(store, spec, owner){
         if (!Array.isArray(owner.removedBuiltinMenus)) owner.removedBuiltinMenus = [];
         var rk = builtinMenuKey(spec.id, m.name);
         if (owner.removedBuiltinMenus.indexOf(rk) < 0) owner.removedBuiltinMenus.push(rk);
+        recordMenuOverrideDeleted(owner, spec, m); /* 오버라이드에도 정확한 키로 남긴다 */
       }
       return;
     }
@@ -1884,12 +2145,17 @@ function mergeBuiltinStores(d){
         /* 중복·잔재 정리는 버전과 무관하게 매번 돌린다 — 옛 스냅샷·델타가 어느 경로로
            들어오든 기본 가게 메뉴가 스펙+(사용자 추가분)으로 수렴하게 하기 위해서다 */
         if (d.stores[i].id === spec.id) pruneBuiltinStoreMenus(d.stores[i], spec, d);
+        /* 사용자 변경은 오버라이드로 끌어올린(백필) 뒤 그 위에 다시 적용한다 —
+           방금 refreshBuiltinStore가 베이스를 스펙으로 되돌렸어도 삭제·가격 수정·
+           추가 메뉴가 여기서 그대로 복원되므로 버전이 올라가도 사용자 변경이 유지된다 */
+        if (d.stores[i].id === spec.id){ backfillMenuOverrides(d, d.stores[i], spec); applyMenuOverridesToStore(d.stores[i], spec, d); }
         return;
       }
     }
     var freshStore = buildBuiltinStore(spec);
     /* 삭제 기록이 있는 기본 메뉴는 처음 채워 넣을 때도 제외한다 */
     freshStore.menus = freshStore.menus.filter(function(m){ return !builtinMenuRemoved(d, spec.id, m.name); });
+    applyMenuOverridesToStore(freshStore, spec, d); /* 오버라이드(삭제·가격·추가)도 처음부터 적용한다 */
     d.stores.push(freshStore);
   });
 }
@@ -1898,6 +2164,7 @@ function defaultState(){
     stores: [],
     removedBuiltins: [],
     removedBuiltinMenus: [],
+    menuOverrides: {},
     removedChannels: [],
     roster: cloneRoster(DEFAULT_ROSTER),
     round: { title:"검증1", storeId:null, parts:["검증1"], absent:[], limits:{ cats:{}, maxPrice:null } },
@@ -2847,6 +3114,7 @@ function ocEntities(s){
     roster: ocClone(s.roster || []),
     removedBuiltins: (s.removedBuiltins || []).slice(),
     removedBuiltinMenus: (s.removedBuiltinMenus || []).slice(),
+    menuOverrides: ocClone(s.menuOverrides || {}),
     removedChannels: (s.removedChannels || []).slice(),
     syncMode: s.syncMode || "delta",
     mts: typeof s.metaMts === "number" ? s.metaMts : 0
@@ -2866,6 +3134,7 @@ function ocFindEnt(s, col, id){
     return { roster: ocClone(s.roster || []),
       removedBuiltins: (s.removedBuiltins || []).slice(),
       removedBuiltinMenus: (s.removedBuiltinMenus || []).slice(),
+      menuOverrides: ocClone(s.menuOverrides || {}),
       removedChannels: (s.removedChannels || []).slice(),
       syncMode: s.syncMode || "delta",
       mts: typeof s.metaMts === "number" ? s.metaMts : 0 };
@@ -3081,6 +3350,7 @@ function ocPlaceEntity(s, col, id, ent, mts){
     if (!st) return false; /* 가게 델타가 아직 안 왔다 — 보류했다가 다시 시도한다 */
     var bspecM = builtinSpecFor(st);
     if (bspecM && builtinMenuRemoved(s, st.id, ent.name)) return true; /* 지운 기본 메뉴는 되살리지 않는다 */
+    if (bspecM && isMenuOverrideDeleted(s, bspecM, ent)) return true; /* 오버라이드로 지운 메뉴(이름+카테고리)도 되살리지 않는다 */
     if (bspecM && (bspecM.drop || []).indexOf(ent.name) >= 0) return true; /* 스펙 교체로 사라진 옛 메뉴는 되살리지 않는다 */
     if (!Array.isArray(st.menus)) st.menus = [];
     /* 메뉴 동일성은 id가 아니라 (이름+카테고리) 기준이다: 같은 항목이 다른 id로 이미 있으면
@@ -3174,6 +3444,10 @@ function ocPlaceEntity(s, col, id, ent, mts){
         if (s[k].indexOf(x) < 0) s[k].push(x);
       });
     });
+    /* 메뉴 오버라이드는 메타 델타가 들고 온 값을 통째로 따른다 — 숨김 해제처럼
+       목록에서 빠지는 변경도 그대로 퍼져야 하기 때문이다(합집합 병합을 쓰지 않는다).
+       필드가 없는 옛 델타가 오면 지금 오버라이드를 그대로 둔다 */
+    if (ent.menuOverrides && typeof ent.menuOverrides === "object") s.menuOverrides = sanitizeMenuOverrides(ent.menuOverrides);
     if (SYNC_MODES[ent.syncMode]) s.syncMode = ent.syncMode;
     s.metaMts = mts;
     return true;
@@ -3203,7 +3477,7 @@ function ocRemoveEntity(s, col, id, mts){
            적용하지 않는다 — 번호가 같을 뿐 삭제 대상이었던 메뉴와는 다른 메뉴이고,
            적용하면 그 이름까지 삭제 기록에 올라 스펙 새로고침으로도 돌아오지 못했다 */
         if (bspec && isLegacyBuiltinMenuId(bspec.id, id) && builtinSpecKeySet(bspec)[menuIdentityKey(menus[j])]) return false;
-        if (bspec){ if (!Array.isArray(s.removedBuiltinMenus)) s.removedBuiltinMenus = []; var key = builtinMenuKey(bspec.id, menus[j].name); if (s.removedBuiltinMenus.indexOf(key) < 0) s.removedBuiltinMenus.push(key); }
+        if (bspec){ if (!Array.isArray(s.removedBuiltinMenus)) s.removedBuiltinMenus = []; var key = builtinMenuKey(bspec.id, menus[j].name); if (s.removedBuiltinMenus.indexOf(key) < 0) s.removedBuiltinMenus.push(key); recordMenuOverrideDeleted(s, bspec, menus[j]); }
         menus.splice(j, 1); return true;
       }
     }
@@ -3306,6 +3580,12 @@ function ocApplyDelta(col, id, msg){
     ocSaveCacheSoon(); /* 복호·반영이 끝난 최신 상태를 로컬 캐시에 남긴다 */
     ocLastRemoteApplyAt = Date.now();
     syncLegacyMirror();
+    /* 메뉴·메타 델타가 닿으면 오버라이드를 메뉴판에 다시 적용한다 — 원격에서 온
+       가격 수정·추가·삭제가 이미 떠 있는 메뉴판에도 그대로 수렴하게 하기 위해서다.
+       삭제된 메뉴는 ocRemoveEntity·메타 적용이 오버라이드에 남겨 두므로 되살아나지 않는다 */
+    if (col === "menus" || col === "meta"){
+      state.stores.forEach(function(st2){ var sp2 = builtinSpecFor(st2); if (sp2) applyMenuOverridesToStore(st2, sp2, state); });
+    }
     ocScheduleDeltaRender();
     ocRetryPending();
     schedulePruneExpiredChannels(); /* 동기화로 받은 주문도 7일이 지났으면 정리한다 */
@@ -3345,6 +3625,7 @@ function hasMeaningfulState(s){
   if (!s || typeof s !== "object") return false;
   if (Array.isArray(s.removedBuiltins) && s.removedBuiltins.length) return true;
   if (Array.isArray(s.removedBuiltinMenus) && s.removedBuiltinMenus.length) return true;
+  if (menuOverridesHasContent(s.menuOverrides)) return true; /* 사용자가 바꾼 메뉴(추가·숨김·삭제·가격)도 지켜야 할 내용이다 */
   if (Array.isArray(s.stores)){
     for (var i = 0; i < s.stores.length; i++){
       var st = s.stores[i];
@@ -3762,6 +4043,10 @@ function mergeStatesOrders(localRaw, remoteRaw){
     base.round = { title:first.title, storeId:first.storeId, parts:first.parts, absent:first.absent, limits:first.limits };
     base.orders = first.orders; base.skips = first.skips;
   }
+  /* 메뉴 오버라이드도 메타 항목 소속이라 명단 승자(metaMts가 큰 쪽) 값을 따른다.
+     동률일 때만 합집합으로 합친다 — mergeMenuOverridesForSnap 참고 */
+  base.menuOverrides = mergeMenuOverridesForSnap(L.menuOverrides, R.menuOverrides,
+    (R.metaMts || 0) === (L.metaMts || 0), rosterWin === R);
   /* 동기화 모드(킬스위치)도 메타 항목 소속이라 명단 승자 쪽 값을 따른다 */
   base.syncMode = (rosterWin === R ? (R.syncMode || L.syncMode) : (L.syncMode || R.syncMode)) || "delta";
   base.metaMts = Math.max(L.metaMts || 0, R.metaMts || 0);
@@ -3921,6 +4206,11 @@ function normalizeState(s){
      이 기록이 없는 옛 버전이 발행한 상태를 받아도, 지금 갖고 있는 기록은 합쳐서 유지한다 (삭제 기록은 쌓이기만 하는 값) */
   d.removedBuiltinMenus = Array.isArray(s.removedBuiltinMenus) ? s.removedBuiltinMenus.filter(function(x){ return typeof x === "string"; }) : [];
   (Array.isArray(state.removedBuiltinMenus) ? state.removedBuiltinMenus : []).forEach(function(k){ if (d.removedBuiltinMenus.indexOf(k) < 0) d.removedBuiltinMenus.push(k); });
+  /* 메뉴 오버라이드도 이어받는다 — 오버라이드 필드 자체가 없는 옛 버전 상태가 와도
+     지금 기기가 가진 오버라이드는 그대로 유지한다(필드가 있으면 그 값이 정답이다) */
+  d.menuOverrides = (s.menuOverrides && typeof s.menuOverrides === "object")
+    ? sanitizeMenuOverrides(s.menuOverrides)
+    : sanitizeMenuOverrides(state.menuOverrides);
   /* 지운 채널 기록도 같은 방식으로 합쳐 유지한다 — 브로커가 갈린 동안 한쪽에서 지운 채널이
      주문 병합 때 다른 쪽 상태에 남아 되살아나지 않게 */
   d.removedChannels = Array.isArray(s.removedChannels) ? s.removedChannels.filter(function(x){ return typeof x === "string"; }) : [];
@@ -4840,17 +5130,28 @@ function renderMenuArea(){
     area.innerHTML = '<div class="empty"><strong>이 가게에 메뉴가 아직 없어요</strong></div>';
     return;
   }
+  /* 오버라이드 ‘숨김’ 메뉴는 주문 화면에서만 뺀다 — 데이터는 rs.menus에 그대로
+     남아 있어 관리 목록·개수·장바구니 정합은 원래 메뉴판 기준으로 동작한다.
+     아래 카테고리 칩·개수·목록·행 높이 기준은 전부 이 보이는 목록(rsView) 기준이다 */
+  var visMenus = visibleMenusForOrder(rs);
+  var rsView = { id: rs.id, name: rs.name, menus: visMenus, categories: rs.categories };
+  if (!visMenus.length){
+    if (searchWrap) searchWrap.classList.add("hidden");
+    if (chipsEarly) chipsEarly.innerHTML = "";
+    area.innerHTML = '<div class="empty"><strong>주문할 수 있는 메뉴가 없어요</strong></div>';
+    return;
+  }
   if (searchWrap) searchWrap.classList.remove("hidden");
   /* 카테고리 칩 — 가게에 실제로 메뉴가 있는 카테고리만 ‘전체’ 뒤에 붙인다.
      고른 카테고리(ui.menuCat)가 사라졌으면 전체로 되돌린다 */
   var chipEl = $("orderCatChips");
-  var catsPresent = storeCategories(rs).filter(function(c){ return rs.menus.some(function(m){ return menuCat(m) === c; }); });
+  var catsPresent = storeCategories(rsView).filter(function(c){ return visMenus.some(function(m){ return menuCat(m) === c; }); });
   if (ui.menuCat && catsPresent.indexOf(ui.menuCat) < 0) ui.menuCat = "";
   /* 칩마다 그 카테고리의 메뉴 개수를 붙인다 — ‘전체’에는 전체 개수를 붙인다 */
   var catCounts = {};
-  rs.menus.forEach(function(m){ var c = menuCat(m); catCounts[c] = (catCounts[c] || 0) + 1; });
+  visMenus.forEach(function(m){ var c = menuCat(m); catCounts[c] = (catCounts[c] || 0) + 1; });
   if (chipEl){
-    chipEl.innerHTML = '<button type="button" class="chip catchip" data-mcat="" aria-pressed="' + (!ui.menuCat) + '">전체 <span class="cnt2">(' + rs.menus.length + ")</span></button>"
+    chipEl.innerHTML = '<button type="button" class="chip catchip" data-mcat="" aria-pressed="' + (!ui.menuCat) + '">전체 <span class="cnt2">(' + visMenus.length + ")</span></button>"
       + catsPresent.map(function(c){ return '<button type="button" class="chip catchip" data-mcat="' + esc(c) + '" aria-pressed="' + (ui.menuCat === c) + '">' + esc(c) + ' <span class="cnt2">(' + (catCounts[c] || 0) + ")</span></button>"; }).join("");
     Array.prototype.forEach.call(chipEl.querySelectorAll("[data-mcat]"), function(b){
       b.addEventListener("click", function(){
@@ -4868,7 +5169,7 @@ function renderMenuArea(){
   /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음).
      검색 중에는 맞는 메뉴가 없는 카테고리는 통째로 숨겨진다 */
   var query = (ui.menuQuery || "").trim().toLowerCase();
-  var menus = rs.menus;
+  var menus = visMenus;
   if (ui.menuCat) menus = menus.filter(function(m){ return menuCat(m) === ui.menuCat; });
   if (query){
     menus = menus.filter(function(m){ return String(m.name || "").toLowerCase().indexOf(query) >= 0; });
@@ -4921,7 +5222,7 @@ function renderMenuArea(){
      검색 중이면 걸러진 메뉴(menus)만으로 묶으므로 맞는 메뉴가 없는 카테고리는 자동으로 숨겨진다 */
   var byCat = {}, appearOrder = [];
   menus.forEach(function(m){ var c = menuCat(m); if (!byCat[c]){ byCat[c] = []; appearOrder.push(c); } byCat[c].push(m); });
-  var prefOrder = storeCategories(rs);
+  var prefOrder = storeCategories(rsView);
   var catOrder = prefOrder.filter(function(c){ return !!byCat[c]; })
     .concat(appearOrder.filter(function(c){ return prefOrder.indexOf(c) < 0; }));
   if (catOrder.length > 1){
@@ -4938,7 +5239,7 @@ function renderMenuArea(){
      지문(fp)은 제한·장바구니처럼 행 높이에 영향을 주는 상태가 바뀔 때만 달라진다 */
   var rowFp = Object.keys(lim.cats).sort().map(function(k){ return k + ":" + lim.cats[k]; }).join(",")
     + "#" + Object.keys(ui.cart || {}).sort().join(",");
-  fixMenuRowHeights(rs, area, menuCard, rowFp);
+  fixMenuRowHeights(rsView, area, menuCard, rowFp);
   Array.prototype.forEach.call(area.querySelectorAll("[data-temp]"), function(b){
     b.addEventListener("click", function(){
       var parts = b.getAttribute("data-temp").split("|"); ui.tempSel[parts[0]] = parts[1];
@@ -6369,6 +6670,9 @@ function renderManageMenus(){
         if (!Array.isArray(state.removedBuiltinMenus)) state.removedBuiltinMenus = [];
         var key = builtinMenuKey(bspec2.id, delMenu.name);
         if (state.removedBuiltinMenus.indexOf(key) < 0) state.removedBuiltinMenus.push(key);
+        /* 오버라이드에도 삭제(이름+카테고리)로 남긴다 — 새 기본 메뉴 버전이 와도
+           이 메뉴가 부활하지 않게 하는 본 기록은 이쪽이다 */
+        recordMenuOverrideDeleted(state, bspec2, delMenu);
       }
       touch();
       publishState(); /* 디바운스를 기다리지 않고 바로 공유 — 열려 있는 주문 화면에 즉시 반영 */
@@ -6951,6 +7255,9 @@ $("addCatBtn").addEventListener("click", function(){
       if (!Array.isArray(s.categories)) s.categories = storeCategories(s);
       s.categories = s.categories.map(function(c){ return c === oldName ? name : c; });
       if (Array.isArray(s.menus)) s.menus.forEach(function(m){ if (menuCat(m) === oldName) m.cat = name; });
+      /* 오버라이드 키의 카테고리 부분도 함께 옮긴다 — 키가 어긋나면 삭제·가격 수정이 풀린다 */
+      var bspecCat = builtinSpecFor(s);
+      if (bspecCat) migrateMenuOverrideCat(state, bspecCat.id, oldName, name);
       /* 채널 주문 제한에 걸린 카테고리 이름도 함께 바꾼다 */
       var limTargets = ensureChannels().map(function(c){ return c.limits; });
       limTargets.push(ui.draft ? ui.draft.limits : null);
@@ -7196,6 +7503,7 @@ $("menuSaveBtn").addEventListener("click", function(){
   if (ui.editMenuId){
     var oldMenu = null;
     s.menus.forEach(function(m){ if (m.id === ui.editMenuId) oldMenu = m; });
+    var oldMenuSnap = oldMenu ? cloneMenuRecord(oldMenu) : null; /* 오버라이드 기록용 — 값을 바꾸기 전에 떠 둔다 */
     s.menus.forEach(function(m){ if (m.id === ui.editMenuId){ m.name = name; m.price = price; m.priceIce = priceIce; m.priceHot = priceHot; m.tempType = tt; m.cat = cat; if (gcStore) m.opt = optFormValue(); } });
     /* 기본 가게 메뉴의 이름을 바꾸면 옛 이름도 삭제 기록에 남긴다 — 기본 메뉴 새로고침이 옛 이름을 새 메뉴로 되살리지 않게 */
     var bspec3 = builtinSpecFor(s);
@@ -7204,11 +7512,18 @@ $("menuSaveBtn").addEventListener("click", function(){
       var rkey = builtinMenuKey(bspec3.id, oldMenu.name);
       if (state.removedBuiltinMenus.indexOf(rkey) < 0) state.removedBuiltinMenus.push(rkey);
     }
+    /* 오버라이드에 변경을 남긴다 — 기본 가게 메뉴의 가격 수정·이름 변경이
+       다음 기본 메뉴 버전에서도 유지되는 근거는 이 기록이다 */
+    if (bspec3 && oldMenuSnap) captureMenuEditOverride(state, s, oldMenuSnap, oldMenu);
     toast("메뉴를 고쳤어요.");
   } else {
     var newMenu = { id: uid("menu"), name: name, price: price, priceIce: priceIce, priceHot: priceHot, tempType: tt, cat: cat };
     if (gcStore) newMenu.opt = optFormValue();
     s.menus.push(newMenu);
+    /* 기본 가게에 추가한 메뉴는 오버라이드 ‘추가’ 레코드로도 남긴다 —
+       기본 메뉴가 버전 새로고침으로 스펙으로 되돌아가도 추가분이 사라지지 않게 */
+    var bspecAdd = builtinSpecFor(s);
+    if (bspecAdd) upsertMenuOverrideAdded(state, bspecAdd, newMenu);
     toast("메뉴 ‘" + name + "’를 추가했어요.");
   }
   resetMenuForm(); ui.cart = {}; touch();
