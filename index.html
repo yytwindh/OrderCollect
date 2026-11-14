@@ -19,7 +19,7 @@
         --line:#DCE9E1; --line-strong:#B7D8C6; --accent:#0F766E; --accent-ink:#FFFFFF; --accent-soft:#D1FAE5;
         --green:#57B98A; --green-text:#0E7A4F; --green-soft:#DCF5E7; --chip:#E9F3ED; --danger:#D64541; --danger-soft:#FDECEA; --danger-solid:#C63631; --danger-solid-hover:#A92C28; --danger-line:#F0B8B3;
         --mint:#D1FAE5; --peach:#FFE1CF; --butter:#FCEFC3; --sky:#CDEFF2; --pink:#FBDCE8; --lav:#DCE9FB;
-        --stat-done-bg:#BFECCD; --stat-done-text:#0B5D2E; --stat-done-line:#8FD0A3;
+        --stat-done-bg:#57B98A; --stat-done-text:#0C3524; --stat-done-line:#57B98A;
         --stat-skip-bg:#D9DEE3; --stat-skip-text:#1F2937; --stat-skip-line:#AEB8C0;
         --stat-pending-bg:#FDE68A; --stat-pending-text:#9A3412; --stat-pending-line:#E5C15C;
         --shadow:0 2px 6px rgba(15,118,110,.05),0 16px 36px rgba(15,118,110,.09);
@@ -32,7 +32,7 @@
           --line:#263B31; --line-strong:#38584A; --accent:#0F766E; --accent-ink:#FFFFFF; --accent-soft:#17443A;
           --green:#4FB286; --green-text:#7BD8AE; --green-soft:#1E4030; --chip:#22362C; --danger:#FF9A92; --danger-soft:#422825; --danger-solid:#C63631; --danger-solid-hover:#A92C28; --danger-line:#6E3B36;
           --mint:#1E4034; --peach:#4A3428; --butter:#4A4023; --sky:#1F4045; --pink:#4A2F3D; --lav:#2A3E55;
-          --stat-done-bg:#1A4731; --stat-done-text:#7EE2A8; --stat-done-line:#2F7A4D;
+          --stat-done-bg:#4FB286; --stat-done-text:#0E241A; --stat-done-line:#4FB286;
           --stat-skip-bg:#3D444B; --stat-skip-text:#E8ECEF; --stat-skip-line:#5B6570;
           --stat-pending-bg:#5A4813; --stat-pending-text:#FFB86B; --stat-pending-line:#8A6D1F;
           --shadow:0 2px 6px rgba(0,0,0,.3),0 16px 36px rgba(0,0,0,.3);
@@ -238,8 +238,7 @@
       .statusline.is-skip .sl,.statusline.is-skip .sn{color:var(--muted)}
       .statusline.is-pending .sl{color:var(--warn-text)}
       .statusline.is-pending .sn{font-weight:700}
-      .pchip[data-state="skip"] .st{background:var(--green);color:#0C3524}
-      @media (prefers-color-scheme: dark){ .pchip[data-state="skip"] .st{color:#0E241A} }
+      .pchip[data-state="skip"] .st{background:var(--stat-skip-bg);color:var(--stat-skip-text)}
       .groupblock{margin-top:12px}
       .groupblock > h3{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
       .groupblock > h3 .gsum{color:var(--muted);font-size:13px;font-weight:700}
