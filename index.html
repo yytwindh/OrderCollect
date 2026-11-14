@@ -4665,7 +4665,8 @@ function startNewOrder(){
    검색창도, 팝업도, 접기도, 내부 스크롤도 없이 카드 안에 그대로 나열한다.
    각 칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시가 이름 옆에 붙는다.
    칩을 누르면 그 사람이 나로 선택된다 (선택된 칩은 .sel로 표시된다).
-   내 상태 알약이나 취소 버튼은 두지 않는다 — 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서
+   이미 선택된 내 칩을 한 번 더 누르면 선택이 취소돼 이름 미선택 상태로 돌아간다.
+   내 상태 알약이나 별도 취소 버튼은 두지 않는다 — 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서
    제출된 주문마다 ‘삭제하고 장바구니에 다시 담기’로 한다 */
 function renderRoster(){
   var area = $("nameSelectArea"); if (!area) return;
@@ -4697,9 +4698,18 @@ function renderRoster(){
   area.innerHTML = html || '<div class="empty"><strong>선택할 수 있는 이름이 없어요</strong></div>';
   Array.prototype.forEach.call(area.querySelectorAll("[data-pname]"), function(chip){
     chip.addEventListener("click", function(){
-      ui.myName = chip.getAttribute("data-pname");
-      ui.myPart = chip.getAttribute("data-ppart");
-      ui.myKey = chip.getAttribute("data-pkey") || "";
+      var pname = chip.getAttribute("data-pname");
+      var pkey = chip.getAttribute("data-pkey") || "";
+      /* 이미 선택된 내 칩을 다시 누르면 선택을 취소해 이름 미선택 상태로 돌아간다.
+         다른 사람 칩을 누르면 그대로 그 사람으로 바뀐다 */
+      var isSel = pkey ? (ui.myKey === pkey) : (ui.myName === pname && !ui.myKey);
+      if (isSel){
+        ui.myName = ""; ui.myPart = ""; ui.myKey = "";
+      } else {
+        ui.myName = pname;
+        ui.myPart = chip.getAttribute("data-ppart");
+        ui.myKey = pkey;
+      }
       renderRoster(); renderOrdersList();
     });
   });
