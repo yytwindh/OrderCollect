@@ -399,8 +399,13 @@
       #nameSelectCard{scroll-margin-top:12px}
       #nameSelectCard.flash{box-shadow:0 0 0 3px var(--accent),var(--shadow)}
       .pchip[data-state="pending"]{border-color:var(--line-strong)}
-      /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다 */
-      .menu-tools{position:sticky;top:8px;z-index:25;background:var(--surface);padding:4px 0 8px}
+      /* 메뉴 검색·카테고리 고정 — 메뉴가 길어도 스크롤 중 검색과 카테고리가 늘 위에 붙어 있다.
+         top을 0보다 살짝 위(-2px)로 잡아 바의 윗변이 화면 맨 위 밖으로 나가게 붙인다:
+         예전 top:8px는 붙은 바 위에 8px 틈을 남겨, 스크롤되는 내용이 그 틈으로
+         얇은 띠처럼 삐져나와 보였다. 배경은 불투명한 var(--surface) 단색으로 꽉 채워
+         아래 내용이 비치지 않게 하고, 늘어난 윗 패딩(12px)이 붙었을 때의
+         라벨 여백(화면 맨 위에서 약 10px)을 예전과 비슷하게 유지한다 */
+      .menu-tools{position:sticky;top:-2px;z-index:25;background:var(--surface);background-color:var(--surface);padding:12px 0 8px}
       /* 카테고리 바 — 한 줄로 작게, 넘치면 가로로 스크롤한다. 검색창과 함께 위에 고정(.menu-tools)된다 */
       .catchips{display:flex;flex-wrap:nowrap;gap:6px;margin-top:8px;overflow-x:auto;overscroll-behavior-x:contain;
         -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
