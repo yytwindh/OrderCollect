@@ -207,6 +207,9 @@
       .listrow .main{flex:1 1 200px;min-width:0}
       .listrow .who{font-weight:800}
       .listrow .detail{color:var(--muted);font-size:13.5px;margin-top:1px}
+      /* 장바구니 항목별 요청사항 메모 입력칸 */
+      .noteinput{width:100%;margin-top:6px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:12px;padding:7px 11px;min-height:36px;font-size:14px}
+      .noteinput::placeholder{color:var(--muted)}
       /* 전체 주문 탭 — 메뉴 하나에 한 줄, 줄 사이는 살짝만 띄운다 */
       .listrow .detail .dline + .dline{margin-top:2px}
       /* 내 주문 항목 — 메뉴 하나에 한 줄, 왼쪽 이름(옵션·수량)·오른쪽 그 메뉴 금액.
@@ -963,6 +966,10 @@
         <div class="mt hidden" id="szBeanWrap">
           <span class="flabel">원두 선택</span>
           <div class="radiochips" id="szBeans" role="radiogroup" aria-label="원두"></div>
+        </div>
+        <div class="mt hidden" id="szShotWrap">
+          <span class="flabel">샷 조절 (기본 레시피 기준)</span>
+          <div class="radiochips" id="szShots" role="radiogroup" aria-label="샷 조절"></div>
         </div>
         <div class="totalbar"><span class="t">선택한 조합 가격</span><span class="v" id="szPriceVal">0원</span></div>
         <div class="btnrow mt">
@@ -2535,12 +2542,14 @@ function refreshOneCart(cart, store){
       var sum = priceFor(menu, e.temp);
       (e.opts.toppings || []).forEach(function(t){ sum += toppingPrice(t); });
       e.price = sum;
-    } else if (e.size || e.bean){
-      /* 사이즈·원두 항목은 고른 조합 가격이 정답 — 메뉴 대표 가격으로 되돌리지 않는다.
-         사이즈가 없는 특수 메뉴(코르타도·에스프레소 등)는 대표 가격에 원두 추가금만 더한다 */
+    } else if (e.size || e.bean || e.shots){
+      /* 사이즈·원두·샷 항목은 고른 조합 가격이 정답 — 메뉴 대표 가격으로 되돌리지 않는다.
+         사이즈가 없는 특수 메뉴(코르타도·에스프레소 등)는 대표 가격에 원두·샷 추가금만 더한다.
+         샷 추가금은 추가한 개수에만 붙는다 (빼기는 무료라 가격을 깎지 않는다) */
       var bp = e.size ? sizePrice(menu, e.size) : null;
       if (bp == null) bp = priceFor(menu, e.temp);
       if (e.bean) bp += beanAdd(menu, e.bean);
+      bp += shotAddPrice(e.shots);
       e.price = bp;
     } else {
       e.price = priceFor(menu, e.temp);
@@ -2704,12 +2713,20 @@ function isGongchaStore(s){ return !!s && (s.id === "builtin-gongcha" || /공차
 function toppingPrice(name){ for (var i = 0; i < GC_TOPPINGS.length; i++) if (GC_TOPPINGS[i][0] === name) return GC_TOPPINGS[i][1]; return 0; }
 function optsSig(opts){ if (!opts) return ""; return (opts.toppings || []).join("+") + "/" + (opts.sweet || "") + "/" + (opts.ice || ""); }
 /* 메뉴 이름 뒤에 붙는 표시: "ICE, 펄 추가, 당도 50%, 얼음 보통" — 옵션이 없으면 기존처럼 온도만 */
-function itemSuffix(it){
+/* 샷 추가금 — 샷은 추가할 때만 1개당 800원이 붙고, 빼는 건 무료라 가격이 줄지 않는다 */
+var SHOT_PRICE = 800;
+function shotAddPrice(shots){ var n = Number(shots) || 0; return n > 0 ? n * SHOT_PRICE : 0; }
+function itemSuffix(it, hideNote){
   var bits = [];
   if (it.temp) bits.push(it.temp);
   if (it.size) bits.push(it.size);
   /* 원두는 기본값(시그니처)일 때는 표시하지 않는다 — 고른 원두만 이름 뒤에 붙는다 */
   if (it.bean && it.bean !== "시그니처") bits.push(it.bean);
+  /* 샷 증감은 기본(0)이 아닐 때만 표시한다: "샷 +1" · "샷 -1" */
+  if (it.shots) bits.push("샷 " + (it.shots > 0 ? "+" + it.shots : String(it.shots)));
+  /* 요청사항 메모는 항목 뒤에 그대로 붙여 주문 넣는 사람이 읽고 반영하게 한다.
+     장바구니 행처럼 메모 입력칸이 따로 있는 곳에서는 hideNote로 이름 줄에서만 뺀다 */
+  if (it.note && !hideNote) bits.push("요청: " + it.note);
   if (it.opts){
     (it.opts.toppings || []).forEach(function(t){ bits.push(t + " 추가"); });
     if (it.opts.sweet) bits.push("당도 " + it.opts.sweet);
@@ -2717,7 +2734,7 @@ function itemSuffix(it){
   }
   return bits.join(", ");
 }
-function itemLabel(it){ var s = itemSuffix(it); return it.name + (s ? " (" + s + ")" : ""); }
+function itemLabel(it, hideNote){ var s = itemSuffix(it, hideNote); return it.name + (s ? " (" + s + ")" : ""); }
 /* ---------- 메뉴별 옵션 규칙 ----------
    메뉴 데이터에 저장된 opt({ sweet, ice, toppings } — 각각 선택 가능 여부)가 있으면 그것을 쓰고,
    없으면 카테고리+온도 구분으로 자동 판단한다 (기존 메뉴 대응):
@@ -4254,7 +4271,8 @@ function aggByMenu(){
   var map = {}, order = [];
   activeChannel().orders.forEach(function(o){
     o.items.forEach(function(it){
-      var key = it.name + "|" + (it.temp||"") + "|" + optsSig(it.opts) + "|" + (it.size || "");
+      /* 합계에서는 원두·샷 증감·메모가 다른 항목을 별도 줄로 구분한다 */
+      var key = it.name + "|" + (it.temp||"") + "|" + optsSig(it.opts) + "|" + (it.size || "") + "|" + (it.bean || "") + "|" + (it.shots || "") + "|" + (it.note || "");
       if (!map[key]){ map[key] = { name:it.name, temp:it.temp||"", suffix:itemSuffix(it), qty:0, amount:0, who:[] }; order.push(key); }
       map[key].qty += it.qty; map[key].amount += it.price*it.qty;
       map[key].who.push(o.name + " ×" + it.qty);
@@ -5370,11 +5388,23 @@ function renderCart(){
     list.innerHTML = '<div class="empty"><strong>아직 담은 메뉴가 없어요</strong></div>';
   } else {
     list.innerHTML = items.map(function(it, idx){
-      /* 공차 옵션·사이즈·원두 항목은 조합별로 나뉘어 있어, 수량 조절도 장바구니에서 항목 단위로 한다 */
-      var ctl = (it.opts || it.size || it.bean) ? '<span class="stepper" style="width:118px;flex:none"><button type="button" data-gc-dec="' + esc(keys[idx]) + '" aria-label="수량 줄이기">−</button><span class="qv">' + it.qty + '</span><button type="button" data-gc-inc="' + esc(keys[idx]) + '" aria-label="수량 늘리기">+</button></span>' : "";
-      return '<div class="listrow"><div class="main"><span class="who">' + esc(itemLabel(it)) + '</span>'
-        + '<div class="detail">' + won(it.price) + " × " + it.qty + '</div></div><span class="amount">' + won(it.price*it.qty) + "</span>" + ctl + "</div>";
+      /* 공차 옵션·사이즈·원두·샷 항목은 조합별로 나뉘어 있어, 수량 조절도 장바구니에서 항목 단위로 한다 */
+      var ctl = (it.opts || it.size || it.bean || it.shots) ? '<span class="stepper" style="width:118px;flex:none"><button type="button" data-gc-dec="' + esc(keys[idx]) + '" aria-label="수량 줄이기">−</button><span class="qv">' + it.qty + '</span><button type="button" data-gc-inc="' + esc(keys[idx]) + '" aria-label="수량 늘리기">+</button></span>' : "";
+      /* 요청사항 메모 — 모든 가게·모든 메뉴의 항목마다 자유롭게 적는다.
+         휘핑·콜드폼·시럽·얼음 양·드리즐처럼 구조화되지 않은 요청용이며,
+         메모로 적은 옵션의 추가 금액은 자동 계산하지 않는다.
+         메모는 다시 그리지 않고 항목에 바로 저장한다 (입력 중 포커스가 날아가지 않게) */
+      var noteHtml = '<input type="text" class="noteinput" data-note="' + esc(keys[idx]) + '" placeholder="요청사항 (예: 휘핑 추가, 얼음 적게)" value="' + esc(it.note || "") + '" aria-label="' + esc(it.name) + ' 요청사항" />';
+      return '<div class="listrow"><div class="main"><span class="who">' + esc(itemLabel(it, true)) + '</span>'
+        + '<div class="detail">' + won(it.price) + " × " + it.qty + "</div>" + noteHtml + '</div><span class="amount">' + won(it.price*it.qty) + "</span>" + ctl + "</div>";
     }).join("");
+    Array.prototype.forEach.call(list.querySelectorAll("[data-note]"), function(inp){
+      inp.addEventListener("input", function(){
+        var e = ui.cart[inp.getAttribute("data-note")]; if (!e) return;
+        var v = inp.value;
+        if (v) e.note = v; else delete e.note;
+      });
+    });
     Array.prototype.forEach.call(list.querySelectorAll("[data-gc-inc]"), function(b){
       b.addEventListener("click", function(){
         var e = ui.cart[b.getAttribute("data-gc-inc")]; if (!e) return;
@@ -5434,31 +5464,38 @@ function restoreOrderToCart(orderId){
     var optsCopy = it.opts ? { toppings: (it.opts.toppings || []).slice(), sweet: it.opts.sweet, ice: it.opts.ice } : null;
     var sizeCopy = it.size || null;
     var beanCopy = it.bean || null;
+    var shotsCopy = it.shots || null;
+    var noteCopy = it.note || null;
     if (menu){
       if (temp) ui.tempSel[menu.id] = temp;
       var t = tempLabel(menu, temp || ui.tempSel[menu.id]);
-      /* 공차 옵션·사이즈·원두 항목은 조합 키로 되돌리고, 단가도 주문 당시 가격 그대로 복원한다 */
+      /* 공차 옵션·사이즈·원두·샷 항목은 조합 키로 되돌리고, 단가도 주문 당시 가격 그대로 복원한다.
+         메모는 장바구니에서 고칠 수 있는 값이라 키에 넣지 않고 항목에 그대로 실어 되돌린다 */
       var key = optsCopy ? (menu.id + "|" + t + "|gc:" + optsSig(optsCopy))
-        : (sizeCopy || beanCopy) ? ((menu.tempType === "both" ? menu.id + "|" + t : menu.id) + (sizeCopy ? "|size:" + sizeCopy : "") + (beanCopy ? "|bean:" + beanCopy : ""))
+        : (sizeCopy || beanCopy || shotsCopy) ? ((menu.tempType === "both" ? menu.id + "|" + t : menu.id) + (sizeCopy ? "|size:" + sizeCopy : "") + (beanCopy ? "|bean:" + beanCopy : "") + (shotsCopy ? "|shot:" + shotsCopy : ""))
         : (menu.tempType === "both" ? menu.id + "|" + (temp || "ICE") : menu.id);
       var existing = ui.cart[key];
-      if (existing){ existing.qty += it.qty; }
+      if (existing){ existing.qty += it.qty; if (noteCopy && !existing.note) existing.note = noteCopy; }
       else {
-        var entry = { menuId: menu.id, name: menu.name, price: (optsCopy || sizeCopy || beanCopy) ? (Number(it.price) || 0) : priceFor(menu, t), tempType: menu.tempType, cat: menuCat(menu), temp: t, qty: it.qty };
+        var entry = { menuId: menu.id, name: menu.name, price: (optsCopy || sizeCopy || beanCopy || shotsCopy) ? (Number(it.price) || 0) : priceFor(menu, t), tempType: menu.tempType, cat: menuCat(menu), temp: t, qty: it.qty };
         if (optsCopy) entry.opts = optsCopy;
         if (sizeCopy) entry.size = sizeCopy;
         if (beanCopy) entry.bean = beanCopy;
+        if (shotsCopy) entry.shots = shotsCopy;
+        if (noteCopy) entry.note = noteCopy;
         ui.cart[key] = entry;
       }
     } else {
-      var key2 = "restored|" + it.name + "|" + temp + "|" + optsSig(it.opts) + "|" + (sizeCopy || "") + "|" + (beanCopy || "");
+      var key2 = "restored|" + it.name + "|" + temp + "|" + optsSig(it.opts) + "|" + (sizeCopy || "") + "|" + (beanCopy || "") + "|" + (shotsCopy || "");
       var ex2 = ui.cart[key2];
-      if (ex2){ ex2.qty += it.qty; }
+      if (ex2){ ex2.qty += it.qty; if (noteCopy && !ex2.note) ex2.note = noteCopy; }
       else {
         var e2 = { menuId: key2, name: it.name, price: Number(it.price) || 0, tempType: temp ? "both" : "none", cat: it.cat || "", temp: temp, qty: it.qty };
         if (optsCopy) e2.opts = optsCopy;
         if (sizeCopy) e2.size = sizeCopy;
         if (beanCopy) e2.bean = beanCopy;
+        if (shotsCopy) e2.shots = shotsCopy;
+        if (noteCopy) e2.note = noteCopy;
         ui.cart[key2] = e2;
       }
     }
@@ -5674,6 +5711,11 @@ function szChecked(name){
   var r = document.querySelector('input[name="' + name + '"]:checked');
   return r ? r.value : "";
 }
+/* 팝업에서 고른 샷 증감 — 기본 레시피 기준 -2~+2, 기본값 0 */
+function szShots(){
+  var v = parseInt(szChecked("szShot"), 10);
+  return isNaN(v) ? 0 : v;
+}
 function szUnitPrice(){
   if (!szSel) return 0;
   var menu = szSel.menu, temp = tempLabel(menu, ui.tempSel[menu.id]);
@@ -5685,6 +5727,8 @@ function szUnitPrice(){
     p = priceFor(menu, temp);
   }
   if (szSel.beans) p += beanAdd(menu, szChecked("szBean"));
+  /* 샷 추가금은 추가한 개수에만 붙는다 (빼기는 무료) */
+  if (szSel.beans) p += shotAddPrice(szShots());
   return p;
 }
 function updateSzModal(){
@@ -5697,11 +5741,12 @@ function openSizeModal(menu){
   var bns = menuBeans(menu);
   if (!szs && !bns) return;
   szSel = { menu: menu, sizes: szs, beans: bns };
-  $("szTitle").textContent = menu.name + " — " + (szs && bns ? "사이즈·원두 선택" : bns ? "원두 선택" : "사이즈 선택");
+  $("szTitle").textContent = menu.name + " — " + (szs && bns ? "사이즈·원두·샷 선택" : bns ? "원두·샷 선택" : "사이즈 선택");
   var hints = [];
   if (menu.tempType === "both") hints.push("온도는 메뉴 목록에서 고른 " + temp + "로 담겨요. 온도를 바꾸려면 팝업을 닫고 목록에서 ICE·HOT을 바꾼 뒤 다시 담아 주세요.");
   if (szs) hints.push("사이즈를 골라 주세요.");
   if (bns) hints.push("원두를 골라 주세요. 디카페인·1/2 디카페인은 300원이 더해져요.");
+  if (bns) hints.push("샷은 기본 레시피 기준이에요. 추가는 1개당 800원, 빼는 건 무료예요.");
   $("szHint").textContent = hints.join(" ");
   $("szSizeWrap").classList.toggle("hidden", !szs);
   if (szs){
@@ -5720,6 +5765,16 @@ function openSizeModal(menu){
     }).join("");
     Array.prototype.forEach.call(document.querySelectorAll('input[name="szBean"]'), function(r){ r.addEventListener("change", updateSzModal); });
   }
+  /* 샷 조절은 에스프레소 음료(원두 선택이 있는 음료)에만 붙인다 — 기본/+1/+2/-1/-2 */
+  $("szShotWrap").classList.toggle("hidden", !bns);
+  if (bns){
+    var shotOpts = [[0, "기본"], [1, "+1"], [2, "+2"], [-1, "-1"], [-2, "-2"]];
+    $("szShots").innerHTML = shotOpts.map(function(o){
+      var add = shotAddPrice(o[0]);
+      return '<label><input type="radio" name="szShot" value="' + o[0] + '"' + (o[0] === 0 ? " checked" : "") + " /> " + o[1] + (add ? " +" + won(add) : "") + "</label>";
+    }).join("");
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="szShot"]'), function(r){ r.addEventListener("change", updateSzModal); });
+  }
   $("sizeModal").classList.remove("hidden");
   _trackModalOpen("sizeModal");
   updateSzModal();
@@ -5732,18 +5787,21 @@ $("szAddBtn").addEventListener("click", function(){
   if (szSel.sizes && !label){ toast("사이즈를 골라 주세요."); return; }
   var bean = szSel.beans ? szChecked("szBean") : "";
   if (szSel.beans && !bean){ toast("원두를 골라 주세요."); return; }
+  var shots = szSel.beans ? szShots() : 0;
   var unit = szUnitPrice();
   var v = limitViolation(menu, 1, unit);
   if (v){ toast(v); return; }
   var temp = tempLabel(menu, ui.tempSel[menu.id]);
   var key = (menu.tempType === "both" ? menu.id + "|" + temp : menu.id)
-    + (label ? "|size:" + label : "") + (bean ? "|bean:" + bean : "");
+    + (label ? "|size:" + label : "") + (bean ? "|bean:" + bean : "")
+    + (shots ? "|shot:" + shots : "");
   var ex = ui.cart[key];
   if (ex) ex.qty += 1;
   else {
     var entry = { menuId: menu.id, name: menu.name, price: unit, tempType: menu.tempType, cat: menuCat(menu), temp: temp, qty: 1 };
     if (label) entry.size = label;
     if (bean) entry.bean = bean;
+    if (shots) entry.shots = shots;
     ui.cart[key] = entry;
   }
   closeSizeModal();
@@ -7099,12 +7157,12 @@ $("skipBtn").addEventListener("click", function(){
   touch(); toast(ui.myName + " · Skip · 주문 안 함");
 });
 
-/* 주문 항목의 동일성 — 같은 메뉴라도 온도·사이즈·원두·옵션(공차 토핑·당도·얼음)이
-   다르거나 가격이 다르면 별도 항목으로 본다. 제출을 더할 때 이 키가 같은 항목끼리만
+/* 주문 항목의 동일성 — 같은 메뉴라도 온도·사이즈·원두·샷 증감·옵션(공차 토핑·당도·얼음)·
+   요청사항 메모가 다르거나 가격이 다르면 별도 항목으로 본다. 제출을 더할 때 이 키가 같은 항목끼리만
    수량을 합치고, 키가 다르면 새 항목으로 붙인다 */
 function orderItemKey(it){
   if (!it) return "";
-  return [it.name || "", (typeof it.price === "number" ? it.price : ""), it.temp || "", it.cat || "", it.size || "", it.bean || "", optsSig(it.opts)].join("|");
+  return [it.name || "", (typeof it.price === "number" ? it.price : ""), it.temp || "", it.cat || "", it.size || "", it.bean || "", it.shots || "", optsSig(it.opts), it.note || ""].join("|");
 }
 $("submitBtn").addEventListener("click", function(){
   /* 버튼은 항상 눌러 볼 수 있다 — 빠진 게 있으면 그걸 먼저 알려준다.
@@ -7123,6 +7181,9 @@ $("submitBtn").addEventListener("click", function(){
     if (it.opts) o.opts = { toppings: (it.opts.toppings || []).slice(), sweet: it.opts.sweet, ice: it.opts.ice };
     if (it.size) o.size = it.size;
     if (it.bean) o.bean = it.bean;
+    if (it.shots) o.shots = it.shots;
+    var note = it.note ? String(it.note).trim() : "";
+    if (note) o.note = note;
     return o;
   });
   /* 이미 제출한 내 주문이 있으면 그 주문을 지우지 않고 그 안에 더한다(+).
