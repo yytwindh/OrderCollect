@@ -433,7 +433,7 @@
       }
       /* 메뉴 목록은 내부 스크롤 상자 없이 페이지 전체 스크롤로 쭉 보인다 —
          카테고리 필터가 걸려도 #menuArea에 높이 제한·자체 스크롤을 두지 않는다 */
-      /* 제출된 주문 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 — 숫자 5칸 바로 아래 한 줄 묶음 */
+      /* 제출된 주문 [메뉴별 합계 | 전체 주문] 탭 — 숫자 5칸 바로 아래 한 줄 묶음 */
       .ordertabs{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:16px}
       #byMenu,#ordersList{margin-top:10px}
       .otab{flex:1 1 0;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:7px;font-weight:800;font-size:14px;min-height:38px;cursor:pointer}
@@ -718,7 +718,7 @@
             </div>
           </div>
 
-          <aside class="order-sidebar" aria-label="내 장바구니와 제출된 주문">
+          <aside class="order-sidebar" aria-label="내 장바구니, 내 주문, 제출된 주문">
             <div class="card" id="cartCard">
               <div class="section-head">
                 <div><h2>내 장바구니</h2></div>
@@ -733,8 +733,14 @@
                 </span>
                 <button class="btn green" id="skipBtn" type="button">Skip · 주문 안 함</button>
               </div>
-              <div id="mySkipNote" class="mt hidden"></div>
               <p class="hint" id="submitConnHint" role="status">연결하는 중…</p>
+            </div>
+
+            <div class="card" id="myOrderCard">
+              <div class="section-head">
+                <div><h2>내 주문</h2></div>
+              </div>
+              <div id="myOrderBody"></div>
             </div>
 
             <div class="card" id="submittedCard">
@@ -3972,7 +3978,7 @@ function renderAll(){
   syncCartChannel();
   refreshCartsFromMenus(); /* 메뉴 삭제·편집이 장바구니에도 바로 반영되게 현재 메뉴판에 맞춘다 */
   var snap = snapshotForms();
-  renderRoster(); renderMenuArea(); renderCart(); renderOrdersList();
+  renderRoster(); renderMenuArea(); renderCart(); renderMyOrder(); renderOrdersList();
   renderSetup(); renderManage(); renderParts(); renderSummary(); renderChannelList(); renderOrderStart(); applyVisibility();
   refreshStoreCounts(); /* 렌더가 끝난 시점의 라이브 상태로 개수를 한 번 더 맞춰 즉시 반영을 보장한다 */
   restoreForms(snap);
@@ -4680,7 +4686,7 @@ function startNewOrder(){
    각 칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시가 이름 옆에 붙는다.
    칩을 누르면 그 사람이 나로 선택된다 (선택된 칩은 .sel로 표시된다).
    이미 선택된 내 칩을 한 번 더 누르면 선택이 취소돼 이름 미선택 상태로 돌아간다.
-   내 상태 알약이나 별도 취소 버튼은 두지 않는다 — 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서
+   내 상태 알약이나 별도 취소 버튼은 두지 않는다 — 내 주문 취소는 장바구니 아래 ‘내 주문’ 카드에서
    제출된 주문마다 ‘삭제하고 장바구니에 다시 담기’로 한다 */
 function renderRoster(){
   var area = $("nameSelectArea"); if (!area) return;
@@ -5090,20 +5096,62 @@ function restoreOrderToCart(orderId){
   var cc = $("cartCard");
   if (cc) cc.scrollIntoView({ behavior: "smooth", block: "center" });
 }
-/* 제출된 주문 내역 — 숫자 5칸 아래 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 한 묶음.
+/* 내 주문인지 — 제출할 때 실린 주인 키(pkey)가 있으면 키로, 없으면(구버전) 이름으로 판단한다 */
+function isMineOrder(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
+function mySkipEntry(){ return ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null); }
+
+/* 내 주문 카드 — 장바구니와 제출된 주문 사이에 둔다.
+   내가 주문했으면 내가 시킨 메뉴와 합계를 보여 주고, 여기서 바로
+   ‘삭제하고 장바구니에 다시 담기’로 내 주문을 취소할 수 있다.
+   Skip을 눌렀으면 ‘이름’ · Skip · 주문 안 함과 Skip 취소 버튼을 보여 준다 */
+function renderMyOrder(){
+  var body = $("myOrderBody"); if (!body) return;
+  var skip = mySkipEntry();
+  if (skip){
+    body.innerHTML = '<div class="totalbar"><span class="t">‘' + esc(skip.name) + "’ · Skip · 주문 안 함</span>"
+      + '<button type="button" class="btn small" id="unskipBtn">Skip 취소</button></div>';
+    var ub = $("unskipBtn");
+    if (ub) ub.addEventListener("click", function(){
+      dropSkipsByPerson(activeChannel(), ui.myName, ui.myKey);
+      touch(); toast("Skip을 취소했어요.");
+    });
+    return;
+  }
+  if (!ui.myName && !ui.myKey){
+    body.innerHTML = '<div class="empty"><strong>이름을 선택하면 내 주문이 보여요</strong></div>';
+    return;
+  }
+  var mineOrders = activeChannel().orders.filter(function(o){ return isMineOrder(o); });
+  if (!mineOrders.length){
+    body.innerHTML = '<div class="empty"><strong>아직 제출한 주문이 없어요</strong></div>';
+    return;
+  }
+  var sum = 0;
+  mineOrders.forEach(function(o){ sum += orderTotal(o); });
+  var rows = mineOrders.slice().reverse().map(function(o){
+    var detail = o.items.map(function(it){ var suf = itemSuffix(it); return esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty; }).join(", ");
+    return '<div class="listrow"><div class="main">'
+      + '<div class="detail">' + detail + '</div></div>'
+      + '<span class="amount">' + won(orderTotal(o)) + "</span>"
+      + '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button></div>'
+      + "</div>";
+  }).join("");
+  body.innerHTML = rows + '<div class="totalbar"><span class="t">합계</span><span class="v">' + won(sum) + "</span></div>";
+  Array.prototype.forEach.call(body.querySelectorAll("[data-restoreorder]"), function(b){
+    b.addEventListener("click", function(){ restoreOrderToCart(b.getAttribute("data-restoreorder")); });
+  });
+}
+
+/* 제출된 주문 내역 — 숫자 5칸 아래 [메뉴별 합계 | 전체 주문] 탭 한 묶음.
    기본 탭은 메뉴별 합계(#byMenu, renderSummary가 채운다)이고,
-   [내 메뉴]에는 내 제출분만 — 내 주문 취소는 여기서 제출된 주문마다
-   ‘삭제하고 장바구니에 다시 담기’로 한다,
-   [멤버 메뉴]에는 다른 사람별로 이름과 주문한 메뉴를 보여 준다 */
+   [전체 주문]에는 모든 인원(내 주문 포함)이 각자 뭘 시켰는지 사람별로 묶어 보여 준다.
+   내 주문 취소는 위 ‘내 주문’ 카드에서 한다 */
 function renderOrdersList(){
   var el = $("ordersList"), tabsEl = $("ordersTabs"), bmEl = $("byMenu");
-  var tab = (ui.ordersTab === "mine" || ui.ordersTab === "members") ? ui.ordersTab : "bymenu";
-  function isMine(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
-  var mineOrders = activeChannel().orders.filter(function(o){ return isMine(o); });
+  var tab = ui.ordersTab === "all" ? "all" : "bymenu";
   if (tabsEl){
     tabsEl.innerHTML = '<button type="button" class="otab" role="tab" data-otab="bymenu" aria-selected="' + (tab === "bymenu") + '">메뉴별 합계</button>'
-      + '<button type="button" class="otab" role="tab" data-otab="mine" aria-selected="' + (tab === "mine") + '">내 메뉴</button>'
-      + '<button type="button" class="otab" role="tab" data-otab="members" aria-selected="' + (tab === "members") + '">멤버 메뉴</button>';
+      + '<button type="button" class="otab" role="tab" data-otab="all" aria-selected="' + (tab === "all") + '">전체 주문</button>';
     Array.prototype.forEach.call(tabsEl.querySelectorAll("[data-otab]"), function(b){
       b.addEventListener("click", function(){ ui.ordersTab = b.getAttribute("data-otab"); renderOrdersList(); });
     });
@@ -5111,51 +5159,30 @@ function renderOrdersList(){
   if (bmEl) bmEl.classList.toggle("hidden", tab !== "bymenu");
   if (el) el.classList.toggle("hidden", tab === "bymenu");
   if (tab === "bymenu") return;
-  function rowHtml(o, mine){
-    var detail = o.items.map(function(it){ var s = itemSuffix(it); return esc(it.name) + (s ? "(" + esc(s) + ")" : "") + " ×" + it.qty; }).join(", ");
-    return '<div class="listrow"><div class="main"><span class="who">' + esc(o.name) + '</span> <span class="tempbadge">' + esc(o.group) + "</span>"
-      + '<div class="detail">' + detail + '</div></div>'
-      + '<span class="amount">' + won(orderTotal(o)) + "</span>"
-      + (mine ? '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button></div>' : "")
-      + "</div>";
-  }
-  if (ui.ordersTab === "members"){
-    var others = activeChannel().orders.filter(function(o){ return !isMine(o); });
-    if (!others.length){
-      el.innerHTML = '<div class="empty"><strong>다른 사람의 주문이 아직 없어요</strong></div>';
-      return;
-    }
-    el.innerHTML = others.slice().reverse().map(function(o){ return rowHtml(o, false); }).join("");
+  var orders = activeChannel().orders;
+  if (!orders.length){
+    el.innerHTML = '<div class="empty"><strong>아직 제출된 주문이 없어요</strong></div>';
     return;
   }
-  if (!ui.myName){
-    el.innerHTML = '<div class="empty"><strong>이름을 선택하면 내 주문이 보여요</strong></div>';
-    return;
-  }
-  if (!mineOrders.length){
-    el.innerHTML = '<div class="empty"><strong>아직 제출한 주문이 없어요</strong></div>';
-    return;
-  }
-  el.innerHTML = mineOrders.slice().reverse().map(function(o){ return rowHtml(o, true); }).join("");
-  Array.prototype.forEach.call(el.querySelectorAll("[data-restoreorder]"), function(b){
-    b.addEventListener("click", function(){
-      restoreOrderToCart(b.getAttribute("data-restoreorder"));
-    });
+  /* 사람별로 묶는다 — 한 사람이 제출을 여러 번 했어도 한 묶음으로 합쳐 보여 준다 */
+  var groups = [], gmap = {};
+  orders.slice().reverse().forEach(function(o){
+    var k = entryPersonKey(o);
+    var g = gmap[k];
+    if (!g){ g = { name:o.name, group:o.group, items:[], total:0 }; gmap[k] = g; groups.push(g); }
+    (o.items || []).forEach(function(it){ g.items.push(it); });
+    g.total += orderTotal(o);
   });
+  el.innerHTML = groups.map(function(g){
+    var detail = g.items.map(function(it){ var suf = itemSuffix(it); return esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty; }).join(", ");
+    return '<div class="listrow"><div class="main"><span class="who">' + esc(g.name) + '</span> <span class="tempbadge">' + esc(g.group) + "</span>"
+      + '<div class="detail">' + detail + '</div></div>'
+      + '<span class="amount">' + won(g.total) + "</span></div>";
+  }).join("");
 }
 
 function updateSkipNote(){
-  var note = $("mySkipNote");
-  var mine = ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null);
-  if (mine){
-    note.classList.remove("hidden");
-    note.innerHTML = '<div class="totalbar"><span class="t">‘' + esc(mine.name) + "’ · Skip · 주문 안 함</span>"
-      + '<button type="button" class="btn small" id="unskipBtn">Skip 취소</button></div>';
-    $("unskipBtn").addEventListener("click", function(){
-      dropSkipsByPerson(activeChannel(), ui.myName, ui.myKey);
-      touch(); toast("Skip을 취소했어요.");
-    });
-  } else { note.classList.add("hidden"); note.innerHTML = ""; }
+  renderMyOrder();
   renderCart();
 }
 
@@ -6620,7 +6647,7 @@ $("channelModalCloseBtn").addEventListener("click", function(){ closeChannelModa
 $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModal(true); });
 
 /* 이름 선택은 ‘이름 선택’ 카드의 칩이 맡는다 — 칩 클릭 연결은 renderRoster가 그릴 때마다 붙인다.
-   팝업·스트립·취소 버튼은 없다. 내 주문 취소는 제출된 주문의 [내 메뉴] 탭에서 한다 */
+   팝업·스트립·취소 버튼은 없다. 내 주문 취소는 장바구니 아래 ‘내 주문’ 카드에서 한다 */
 
 /* 이름을 안 고른 채 제출·Skip을 누르면 경고와 함께 ‘이름 선택’ 카드로 바로 이동한다 —
    메뉴를 담느라 아래로 내려간 상태에서도 다시 쭉 올릴 필요 없이 칩을 바로 누를 수 있게 한다 */
