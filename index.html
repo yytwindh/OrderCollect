@@ -4767,13 +4767,9 @@ function renderMenuArea(){
       b.addEventListener("click", function(){
         ui.menuCat = b.getAttribute("data-mcat") || "";
         renderMenuArea();
-        /* 카테고리를 바꾸면 메뉴 목록을 맨 위로 올린다 — 메뉴 카드가 화면 위쪽에 오게 페이지 스크롤을 되돌린다 */
-        var card = area.closest ? area.closest(".card") : null;
-        var anchor = card || area;
-        var y = anchor.getBoundingClientRect().top + window.pageYOffset - 8;
-        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        window.scrollTo({ top: Math.max(0, y), behavior: reduce ? "auto" : "smooth" });
-        /* 고른 칩이 가로 스크롤 바 안에서 보이도록 칩 바도 함께 맞춘다 */
+        /* 카테고리를 바꿔도 화면은 움직이지 않는다 — 카테고리 바가 위에 고정돼 있어
+           그 자리에서 메뉴만 필터되면 된다. 페이지 스크롤을 강제하지 않는다 */
+        /* 고른 칩이 가로 스크롤 바 안에서 보이도록 칩 바 내부 위치만 맞춘다 (페이지 스크롤 아님) */
         var active = chipEl.querySelector('[aria-pressed="true"]');
         if (active) chipEl.scrollLeft = Math.max(0, active.offsetLeft - 6);
       });
