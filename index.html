@@ -203,8 +203,12 @@
       .totalbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:var(--accent-soft);border-radius:20px;padding:10px 14px;margin-top:10px}
       .totalbar .t{font-size:14px;font-weight:700}
       .totalbar .v{font-size:21px;font-weight:800}
-      .stats{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
-      .stat{flex:1 1 110px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:9px 12px;display:flex;flex-direction:column}
+      /* 제출된 주문 숫자 5칸 — 첫째 줄 총액·전체 수량 2칸, 둘째 줄 주문 완료·Skip·아직 안 함 3칸.
+         6열 그리드에서 앞 2칸은 3열씩, 뒤 3칸은 2열씩 나눠 가져 줄 나눔을 고정한다 */
+      .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:stretch}
+      .stat{min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:9px 12px;display:flex;flex-direction:column}
+      .stat:nth-child(1),.stat:nth-child(2){grid-column:span 3}
+      .stat:nth-child(3),.stat:nth-child(4),.stat:nth-child(5){grid-column:span 2}
       .stat:nth-child(1){background:var(--accent-soft)} .stat:nth-child(2){background:var(--green-soft)}
       .stat:nth-child(3){background:var(--butter)} .stat:nth-child(4){background:var(--sky)} .stat:nth-child(5){background:var(--pink)}
       .stat .k{font-size:13px;color:var(--muted);font-weight:700}
