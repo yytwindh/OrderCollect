@@ -406,6 +406,12 @@
         -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
       .catchips::-webkit-scrollbar{display:none}
       .catchip{min-height:34px;padding:4px 13px;font-size:13.5px;flex:none;white-space:nowrap}
+      /* PC(1024px 이상)에서는 카테고리 칩이 자유롭게 줄바꿈돼 전부 보이게 한다 —
+         2줄로 고정하지 않고 카테고리가 많아지면 3·4줄로 알아서 늘어난다.
+         가로 스크롤은 필요 없어진다. 모바일은 위 한 줄 가로 스크롤 그대로 둔다 */
+      @media (min-width:1024px){
+        .catchips{flex-wrap:wrap;overflow-x:visible;overscroll-behavior-x:auto}
+      }
       /* 메뉴 목록은 내부 스크롤 상자 없이 페이지 전체 스크롤로 쭉 보인다 —
          카테고리 필터가 걸려도 #menuArea에 높이 제한·자체 스크롤을 두지 않는다 */
       /* 제출된 주문 [메뉴별 합계 | 내 메뉴 | 멤버 메뉴] 탭 — 숫자 5칸 바로 아래 한 줄 묶음 */
