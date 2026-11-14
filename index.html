@@ -207,6 +207,13 @@
       .listrow .main{flex:1 1 200px;min-width:0}
       .listrow .who{font-weight:800}
       .listrow .detail{color:var(--muted);font-size:13.5px;margin-top:1px}
+      /* 내 주문 항목 — 메뉴 하나에 한 줄, 왼쪽 이름(옵션·수량)·오른쪽 그 메뉴 금액.
+         이름이 길어도 금액이 아래 줄로 밀리지 않게 줄바꿈을 막고 이름 쪽만 줄어들게 한다 */
+      .myorder-item{flex-wrap:nowrap;align-items:center}
+      .myorder-item .main{flex:1 1 auto}
+      .myorder-item .who{font-size:14.5px;line-height:1.4}
+      .myorder-item .amount{flex:none}
+      .myorder-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
       .amount{font-weight:800;white-space:nowrap}
       .empty{border:1.5px dashed var(--line-strong);border-radius:20px;padding:14px 12px;text-align:center;color:var(--muted);font-size:14px;background:var(--surface-2)}
       .empty strong{color:var(--ink);display:block;font-size:15.5px;margin-bottom:4px}
@@ -5113,7 +5120,8 @@ function isMineOrder(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (
 function mySkipEntry(){ return ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null); }
 
 /* 내 주문 카드 — 장바구니와 제출된 주문 사이에 둔다.
-   내가 주문했으면 내가 시킨 메뉴와 합계를 보여 주고, 여기서 바로
+   내가 주문했으면 내가 시킨 메뉴를 하나씩 한 줄로(왼쪽 이름·수량, 오른쪽 그 메뉴 금액)
+   보여 주고 아래에 합계를 두며, 여기서 바로
    ‘삭제하고 장바구니에 다시 담기’로 내 주문을 취소할 수 있다.
    Skip을 눌렀으면 ‘이름’ · Skip · 주문 안 함과 Skip 취소 버튼을 보여 준다 */
 function renderMyOrder(){
@@ -5140,15 +5148,25 @@ function renderMyOrder(){
   }
   var sum = 0;
   mineOrders.forEach(function(o){ sum += orderTotal(o); });
-  var rows = mineOrders.slice().reverse().map(function(o){
-    var detail = o.items.map(function(it){ var suf = itemSuffix(it); return esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty; }).join(", ");
-    return '<div class="listrow"><div class="main">'
-      + '<div class="detail">' + detail + '</div></div>'
-      + '<span class="amount">' + won(orderTotal(o)) + "</span>"
-      + '<div class="order-restore-row"><button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button></div>'
-      + "</div>";
+  /* 메뉴를 하나씩 한 줄로 — 왼쪽은 메뉴 이름(사이즈·옵션 포함)과 수량,
+     오른쪽은 그 메뉴만의 금액(가격×수량). 예전처럼 쉼표로 한 줄에 몰지 않고
+     주문이 여러 건이어도 항목을 전부 펼쳐 보여 준다 */
+  var itemRows = [];
+  mineOrders.slice().reverse().forEach(function(o){
+    (o.items || []).forEach(function(it){
+      var suf = itemSuffix(it);
+      var label = esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty;
+      var lineTotal = (Number(it.price) || 0) * (Number(it.qty) || 0);
+      itemRows.push('<div class="listrow myorder-item"><div class="main">'
+        + '<span class="who">' + label + "</span></div>"
+        + '<span class="amount">' + won(lineTotal) + "</span></div>");
+    });
+  });
+  var restoreBtns = mineOrders.slice().reverse().map(function(o){
+    return '<button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button>';
   }).join("");
-  body.innerHTML = rows + '<div class="totalbar"><span class="t">합계</span><span class="v">' + won(sum) + "</span></div>";
+  body.innerHTML = itemRows.join("") + '<div class="myorder-actions">' + restoreBtns + "</div>"
+    + '<div class="totalbar"><span class="t">합계</span><span class="v">' + won(sum) + "</span></div>";
   Array.prototype.forEach.call(body.querySelectorAll("[data-restoreorder]"), function(b){
     b.addEventListener("click", function(){ restoreOrderToCart(b.getAttribute("data-restoreorder")); });
   });
