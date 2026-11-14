@@ -128,7 +128,7 @@
       .pchip[data-state="ordered"]{border-color:var(--green);background:var(--green-soft)}
       .pchip[data-state="ordered"] .st{background:var(--green);color:#0C3524}
       @media (prefers-color-scheme: dark){ .pchip[data-state="ordered"] .st{color:#0E241A} }
-      .pchip[data-state="skip"]{border-style:dashed;color:var(--muted);background:var(--surface-2)}
+      .pchip[data-state="skip"]{border-color:var(--green);background:var(--green-soft)}
       .pchip.sel{outline:3px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
       .pchip.absent{border-style:dashed;color:var(--muted);background:var(--surface-2);text-decoration:line-through}
       .pchip.absent .st{background:var(--danger-soft);color:var(--danger);text-decoration:none}
@@ -224,7 +224,8 @@
       .statusline.is-skip .sl,.statusline.is-skip .sn{color:var(--muted)}
       .statusline.is-pending .sl{color:var(--warn-text)}
       .statusline.is-pending .sn{font-weight:700}
-      .pchip[data-state="skip"] .st{background:var(--line-strong);color:var(--muted)}
+      .pchip[data-state="skip"] .st{background:var(--green);color:#0C3524}
+      @media (prefers-color-scheme: dark){ .pchip[data-state="skip"] .st{color:#0E241A} }
       .groupblock{margin-top:12px}
       .groupblock > h3{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
       .groupblock > h3 .gsum{color:var(--muted);font-size:13px;font-weight:700}
