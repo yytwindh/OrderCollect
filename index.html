@@ -22,6 +22,8 @@
         --stat-done-bg:#57B98A; --stat-done-text:#0C3524; --stat-done-line:#57B98A;
         --stat-skip-bg:#D9DEE3; --stat-skip-text:#1F2937; --stat-skip-line:#AEB8C0;
         --stat-pending-bg:#FDE68A; --stat-pending-text:#9A3412; --stat-pending-line:#E5C15C;
+        --stat-total-bg:#7ED3A0; --stat-total-text:#064E2B; --stat-total-line:#57B98A;
+        --stat-qty-bg:#93C5FD; --stat-qty-text:#0A2E6E; --stat-qty-line:#60A5FA;
         --shadow:0 2px 6px rgba(15,118,110,.05),0 16px 36px rgba(15,118,110,.09);
         --scroll-thumb:rgba(15,118,110,.42);
         --radius:24px;
@@ -35,6 +37,8 @@
           --stat-done-bg:#4FB286; --stat-done-text:#0E241A; --stat-done-line:#4FB286;
           --stat-skip-bg:#3D444B; --stat-skip-text:#E8ECEF; --stat-skip-line:#5B6570;
           --stat-pending-bg:#5A4813; --stat-pending-text:#FFB86B; --stat-pending-line:#8A6D1F;
+          --stat-total-bg:#4FB286; --stat-total-text:#0E241A; --stat-total-line:#4FB286;
+          --stat-qty-bg:#5B8DEF; --stat-qty-text:#0A1E42; --stat-qty-line:#5B8DEF;
           --shadow:0 2px 6px rgba(0,0,0,.3),0 16px 36px rgba(0,0,0,.3);
           --scroll-thumb:rgba(123,216,174,.5);
         }
@@ -215,7 +219,7 @@
       .stat{min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:9px 12px;display:flex;flex-direction:column}
       .stat:nth-child(1),.stat:nth-child(2){grid-column:span 3}
       .stat:nth-child(3),.stat:nth-child(4),.stat:nth-child(5){grid-column:span 2}
-      .stat:nth-child(1){background:var(--accent-soft)} .stat:nth-child(2){background:var(--green-soft)}
+      .stat:nth-child(1){background:var(--stat-total-bg)} .stat:nth-child(2){background:var(--stat-qty-bg)}
       .stat:nth-child(3){background:var(--stat-done-bg)} .stat:nth-child(4){background:var(--stat-skip-bg)} .stat:nth-child(5){background:var(--stat-pending-bg)}
       .stat .k{font-size:13px;color:var(--muted);font-weight:700}
       .stat .v{font-size:20px;font-weight:800;margin-top:1px}
@@ -235,6 +239,14 @@
       .stats .stat-pending .v{color:var(--stat-pending-text)}
       .stats .stat-pending .v small{color:var(--stat-pending-text);opacity:.9}
       .stats .stat-pending .k{color:var(--stat-pending-text)}
+      /* 위 2칸 — 총액은 초록 배경에 진한 초록 숫자, 전체 수량은 파랑 배경에 진한 파랑 숫자.
+         흐린 민트·연초록 대신 배경과 숫자가 또렷하게 구분되게 한다 (아래 3칸 색은 그대로) */
+      .stats .stat-total{background:var(--stat-total-bg);border-color:var(--stat-total-line)}
+      .stats .stat-total .v,.stats .stat-total .k{color:var(--stat-total-text)}
+      .stats .stat-total .v small{color:var(--stat-total-text);opacity:.85}
+      .stats .stat-qty{background:var(--stat-qty-bg);border-color:var(--stat-qty-line)}
+      .stats .stat-qty .v,.stats .stat-qty .k{color:var(--stat-qty-text)}
+      .stats .stat-qty .v small{color:var(--stat-qty-text);opacity:.85}
       .statusline.is-skip .sl,.statusline.is-skip .sn{color:var(--muted)}
       .statusline.is-pending .sl{color:var(--warn-text)}
       .statusline.is-pending .sn{font-weight:700}
@@ -747,8 +759,8 @@
                 <div><h2>제출된 주문</h2></div>
               </div>
               <div class="stats">
-                <div class="stat"><div class="k">총액</div><div class="v" id="statTotal">0원</div></div>
-                <div class="stat"><div class="k">전체 수량</div><div class="v" id="statQty">0<small> 개</small></div></div>
+                <div class="stat stat-total"><div class="k">총액</div><div class="v" id="statTotal">0원</div></div>
+                <div class="stat stat-qty"><div class="k">전체 수량</div><div class="v" id="statQty">0<small> 개</small></div></div>
                 <div class="stat stat-done"><div class="k">주문 완료</div><div class="v" id="statPeople">0<small> 명</small></div></div>
                 <div class="stat stat-skip"><div class="k">Skip</div><div class="v" id="statSkip">0<small> 명</small></div></div>
                 <div class="stat stat-pending"><div class="k">아직 안 함</div><div class="v" id="statPending">0<small> 명</small></div></div>
@@ -6674,6 +6686,13 @@ $("skipBtn").addEventListener("click", function(){
   touch(); toast(ui.myName + " · Skip · 주문 안 함");
 });
 
+/* 주문 항목의 동일성 — 같은 메뉴라도 온도·사이즈·원두·옵션(공차 토핑·당도·얼음)이
+   다르거나 가격이 다르면 별도 항목으로 본다. 제출을 더할 때 이 키가 같은 항목끼리만
+   수량을 합치고, 키가 다르면 새 항목으로 붙인다 */
+function orderItemKey(it){
+  if (!it) return "";
+  return [it.name || "", (typeof it.price === "number" ? it.price : ""), it.temp || "", it.cat || "", it.size || "", it.bean || "", optsSig(it.opts)].join("|");
+}
 $("submitBtn").addEventListener("click", function(){
   /* 버튼은 항상 눌러 볼 수 있다 — 빠진 게 있으면 그걸 먼저 알려준다.
      이름을 안 골랐으면 경고만 띄우지 않고 ‘이름 선택’ 카드 자리로 바로 이동한다 */
@@ -6685,22 +6704,47 @@ $("submitBtn").addEventListener("click", function(){
   var viol = cartViolation();
   if (viol){ toast(viol); return; }
   dropSkipsByPerson(activeChannel(), ui.myName, ui.myKey);
-  dropOrdersByPerson(activeChannel(), ui.myName, ui.myKey);
-  var ordEntry = {
-    id: uid("ord"), name: ui.myName, group: ui.myPart, storeId: activeChannel().storeId,
-    items: items.map(function(it){
-      var o = { name: it.name, price: it.price, temp: it.temp, qty: it.qty, cat: it.cat || "" };
-      if (it.opts) o.opts = { toppings: (it.opts.toppings || []).slice(), sweet: it.opts.sweet, ice: it.opts.ice };
-      if (it.size) o.size = it.size;
-      return o;
-    }),
-    ts: Date.now()
-  };
-  if (ui.myKey) ordEntry.pkey = ui.myKey; /* 동명이인과 구분되게 고른 사람의 키를 함께 남긴다 */
-  activeChannel().orders.push(ordEntry);
+  var ch = activeChannel();
+  var newItems = items.map(function(it){
+    var o = { name: it.name, price: it.price, temp: it.temp, qty: it.qty, cat: it.cat || "" };
+    if (it.opts) o.opts = { toppings: (it.opts.toppings || []).slice(), sweet: it.opts.sweet, ice: it.opts.ice };
+    if (it.size) o.size = it.size;
+    if (it.bean) o.bean = it.bean;
+    return o;
+  });
+  /* 이미 제출한 내 주문이 있으면 그 주문을 지우지 않고 그 안에 더한다(+).
+     새 주문 항목을 따로 만들면 동기화 병합의 ‘한 사람 주문은 하나’ 규칙이
+     옛 항목을 버려 기존 주문이 사라지므로, 반드시 기존 항목(id 유지)을 고쳐 쓴다.
+     같은 항목(메뉴·온도·사이즈·원두·옵션·가격이 모두 같음)은 수량만 더하고,
+     다른 항목은 기존 항목 뒤에 새로 붙인다 — 기존 항목 자체는 건드리지 않는다 */
+  var mine = (ch.orders || []).filter(function(o){ return isMineOrder(o); });
+  var merged = false;
+  if (mine.length){
+    var target = mine[0];
+    mine.forEach(function(o){ if ((o.ts || 0) > (target.ts || 0)) target = o; });
+    if (!Array.isArray(target.items)) target.items = [];
+    newItems.forEach(function(ni){
+      var key = orderItemKey(ni), found = null;
+      target.items.forEach(function(ei){ if (!found && orderItemKey(ei) === key) found = ei; });
+      if (found) found.qty += ni.qty;
+      else target.items.push(ni);
+    });
+    target.ts = Date.now(); /* 병합·델타가 이 버전을 최신으로 알아보게 제출 시각을 새로 찍는다 */
+    target.storeId = ch.storeId;
+    if (!target.pkey && ui.myKey) target.pkey = ui.myKey;
+    merged = true;
+  } else {
+    var ordEntry = {
+      id: uid("ord"), name: ui.myName, group: ui.myPart, storeId: ch.storeId,
+      items: newItems,
+      ts: Date.now()
+    };
+    if (ui.myKey) ordEntry.pkey = ui.myKey; /* 동명이인과 구분되게 고른 사람의 키를 함께 남긴다 */
+    ch.orders.push(ordEntry);
+  }
   ui.cart = {}; ui.tempSel = {};
   touch();
-  toast("주문이 제출됐어요.");
+  toast(merged ? "기존 주문에 추가됐어요." : "주문이 제출됐어요.");
   var sc = $("submittedCard");
   if (sc) sc.scrollIntoView({ behavior:"smooth", block:"start" });
 });
