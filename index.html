@@ -6355,43 +6355,79 @@ function storeCopyText(){
 }
 function allCopyText(){
   var rs = roundStore(), t = totals(), lines = [];
-  lines.push("📋 주문 취합 — " + (activeChannel().title || "검증1") + (rs ? " (" + rs.name + ")" : ""));
-  lines.push("주문 " + t.people + "명 · 총 " + t.qty + "개 · " + won(t.amount));
-  if (limitsQtyText(activeChannel().limits)) lines.push("수량 제한 — " + limitsQtyText(activeChannel().limits));
-  if (limitsPriceText(activeChannel().limits)) lines.push("금액 제한 — " + limitsPriceText(activeChannel().limits));
+  /* 첫 줄은 가게 이름만 — 취합 시간·날짜, 채널 제목, 인원·총수량 요약 줄은 넣지 않는다 */
+  lines.push(rs ? rs.name : (activeChannel().title || "주문"));
   lines.push("");
-  lines.push("■ 메뉴별 합계");
-  aggByMenu().forEach(function(a){ lines.push("- " + a.name + (a.suffix ? " (" + a.suffix + ")" : "") + " × " + a.qty + " — " + won(a.amount)); });
-  lines.push("");
-  lines.push("■ 파트별 내역");
-  var seen = [];
-  activeChannel().orders.forEach(function(o){ if (seen.indexOf(o.group) < 0) seen.push(o.group); });
-  seen.forEach(function(g){
-    var os = activeChannel().orders.filter(function(o){ return o.group === g; });
-    var sub = os.reduce(function(a,o){ return a + orderTotal(o); }, 0);
-    lines.push("[" + g + "] 소계 " + won(sub));
-    os.forEach(function(o){
-      var detail = o.items.map(function(it){ var s = itemSuffix(it); return it.name + (s ? "(" + s + ")" : "") + " ×" + it.qty; }).join(", ");
-      lines.push("- " + o.name + ": " + detail + " (" + won(orderTotal(o)) + ")");
+  lines.push("[메뉴별 합계]");
+  aggByMenu().forEach(function(a){ lines.push(a.name + (a.suffix ? " (" + a.suffix + ")" : "") + " " + a.qty + "개 " + won(a.amount)); });
+  lines.push("합계 " + won(t.amount));
+  /* 파트별 섹션 — 명단(그룹 › 파트) 순서 그대로 이어 쓰고, 한 사람에 한 줄씩 쓴다.
+     주문한 사람은 ‘이름: 메뉴 (사이즈·옵션) ×수량’, Skip은 ‘이름: Skip’,
+     아직 안 한 사람은 ‘이름: 아직 안 함’으로 쓴다. 별도 Skip·아직 안 함·자리 비움
+     섹션은 만들지 않는다 (자리 비운 사람은 명단에서 빠져 있어 나오지 않는다) */
+  var usedOrders = {}, usedSkips = {};
+  function personOrders(p){
+    var out = [];
+    activeChannel().orders.forEach(function(o){
+      var hit = p.key ? (o.pkey === p.key || (!o.pkey && o.name === p.name)) : (o.name === p.name);
+      if (hit){ out.push(o); usedOrders[o.id] = 1; }
+    });
+    return out;
+  }
+  function personIsSkip(p){
+    var hit = false;
+    activeChannel().skips.forEach(function(s){
+      var is = p.key ? (s.pkey === p.key || (!s.pkey && s.name === p.name)) : (s.name === p.name);
+      if (is){ hit = true; usedSkips[s.id] = 1; }
+    });
+    return hit;
+  }
+  function orderLine(name, orders){
+    var map = {}, seq = [];
+    orders.forEach(function(o){
+      (o.items || []).forEach(function(it){
+        var lab = itemLabel(it);
+        if (!(lab in map)){ map[lab] = 0; seq.push(lab); }
+        map[lab] += it.qty;
+      });
+    });
+    return name + ": " + seq.map(function(lab){ return lab + " ×" + map[lab]; }).join(", ");
+  }
+  var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
+  blocks.forEach(function(b){
+    if (!b.members.length) return;
+    lines.push("");
+    lines.push("[" + blockTitle(b) + "]");
+    b.members.forEach(function(name, i){
+      var p = { name: name, key: (b.keys ? b.keys[i] : "") || "", part: b.part, group: b.group || "" };
+      var orders = personOrders(p);
+      var isSkip = personIsSkip(p);
+      if (orders.length) lines.push(orderLine(name, orders));
+      else if (isSkip) lines.push(name + ": Skip");
+      else lines.push(name + ": 아직 안 함");
     });
   });
-  if (activeChannel().skips.length){
-    lines.push("");
-    lines.push("■ Skip · 주문 안 함 (" + activeChannel().skips.length + "명)");
-    activeChannel().skips.forEach(function(s){ lines.push("- " + s.name + " (" + s.group + ")"); });
+  /* 명단에는 없는데 주문·Skip만 남은 사람(명단이 바뀐 경우)도 빠뜨리지 않고
+     그 사람이 속했던 그룹·파트 섹션으로 뒤에 이어 붙인다 */
+  var strayGroups = [], strayMap = {};
+  function straySection(label){
+    if (!strayMap[label]){ strayMap[label] = { label: label, orders: [], skips: [] }; strayGroups.push(strayMap[label]); }
+    return strayMap[label];
   }
-  var absentList = absentInParts(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
-  if (absentList.length){
+  activeChannel().orders.forEach(function(o){ if (!usedOrders[o.id]) straySection(o.group || "기타").orders.push(o); });
+  activeChannel().skips.forEach(function(s){ if (!usedSkips[s.id]) straySection(s.group || "기타").skips.push(s); });
+  strayGroups.forEach(function(sec){
     lines.push("");
-    lines.push("■ 자리 비움 — 이번 주문 제외 (" + absentList.length + "명)");
-    absentList.forEach(function(a){ lines.push("- " + a.name + " (" + a.part + ")"); });
-  }
-  var pend = pendingList();
-  if (pend.length){
-    lines.push("");
-    lines.push("■ 아직 안 함 (" + pend.length + "명)");
-    lines.push(pend.map(function(p){ return p.name; }).join(", "));
-  }
+    lines.push("[" + sec.label + "]");
+    var byPerson = {}, seq = [];
+    sec.orders.forEach(function(o){
+      var k = entryPersonKey(o);
+      if (!byPerson[k]){ byPerson[k] = { name: o.name, orders: [] }; seq.push(byPerson[k]); }
+      byPerson[k].orders.push(o);
+    });
+    seq.forEach(function(e){ lines.push(orderLine(e.name, e.orders)); });
+    sec.skips.forEach(function(s){ lines.push(s.name + ": Skip"); });
+  });
   return lines.join("\n");
 }
 function copyText(text, okMsg){
