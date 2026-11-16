@@ -169,6 +169,7 @@
       .mrow .mprice{color:var(--muted);font-weight:700;font-size:13px;margin-top:1px}
       .mrow .mnote{font-size:12px;color:var(--muted);margin-top:2px}
       .mrow .mnote.warn{color:var(--danger);font-weight:700}
+      .sweetbadge{display:inline-block;font-size:11.5px;font-weight:800;color:var(--accent);background:var(--accent-soft);border:1px solid var(--line-strong);border-radius:999px;padding:2px 8px;margin-top:3px;line-height:1.4;white-space:nowrap}
       /* 온도 칩 영역은 고정 폭으로 맞춰 메뉴마다 담기 버튼 위치가 흔들리지 않게 한다 */
       .tempslot{flex:0 0 88px;display:flex;gap:4px;justify-content:flex-end;align-items:center}
       .tchip{font-size:11.5px;font-weight:800;padding:4px 7px;border-radius:999px;border:1px solid var(--line-strong);color:var(--muted);background:var(--surface);white-space:nowrap;line-height:1.4}
@@ -910,12 +911,29 @@
             <label><input type="radio" name="tempType" value="none" /> 구분없음 (음식 등)</label>
           </div>
         </div>
-        <!-- 공차 가게에서만 보이는 옵션 설정: 주문 팝업에서 이 메뉴에 보여줄 옵션을 메뉴 데이터에 저장한다 -->
+        <!-- 공차 가게에서만 보이는 옵션 설정: 주문 팝업에서 이 메뉴에 보여줄 옵션을 메뉴 데이터에 저장한다.
+             당도는 ‘없음’(선택기 자체가 안 뜸) 또는 ‘기본값’(0/30/50/70/100% 중 하나를 기본으로 저장) 중 하나다.
+             기본값이 있으면 주문 팝업에서 그 값이 처음 선택돼 있고, 주문 화면 메뉴에도 작게 표시된다 -->
         <div class="mt hidden" id="menuOptWrap">
           <span class="flabel">옵션 설정 (공차 메뉴)</span>
           <p class="hint" style="margin:2px 0 8px">주문 팝업에 보여줄 항목이에요.<br />카테고리를 바꾸면 기본값이 다시 맞춰집니다.</p>
-          <div class="radiochips">
-            <label><input type="checkbox" id="optSweetChk" /> 당도 선택 가능</label>
+          <span class="flabel">당도</span>
+          <div class="radiochips" role="radiogroup" aria-label="당도 설정">
+            <label><input type="radio" name="optSweetMode" value="none" /> 없음</label>
+            <label><input type="radio" name="optSweetMode" value="default" checked /> 기본값</label>
+          </div>
+          <div id="optSweetDefaultWrap" style="margin-top:8px">
+            <span class="flabel">기본 당도</span>
+            <div class="radiochips" role="radiogroup" aria-label="기본 당도">
+              <label><input type="radio" name="optSweetDefault" value="0%" /> 0%</label>
+              <label><input type="radio" name="optSweetDefault" value="30%" /> 30%</label>
+              <label><input type="radio" name="optSweetDefault" value="50%" checked /> 50%</label>
+              <label><input type="radio" name="optSweetDefault" value="70%" /> 70%</label>
+              <label><input type="radio" name="optSweetDefault" value="100%" /> 100%</label>
+            </div>
+            <p class="hint">주문할 때 당도 선택기가 이 값으로 처음 뜨고, 메뉴에도 작게 “당도 30%”처럼 표시돼요. “없음”이면 당도 선택 자체가 안 떠요.</p>
+          </div>
+          <div class="radiochips" style="margin-top:10px">
             <label><input type="checkbox" id="optIceChk" /> 얼음양 선택 가능</label>
             <label><input type="checkbox" id="optTopChk" /> 토핑 추가 가능</label>
           </div>
@@ -1913,7 +1931,7 @@ function menuExtraSig(m){
   if (!m) return "";
   var sz = Array.isArray(m.sizes) ? m.sizes.map(function(s){ return String(s.label) + ":" + Number(s.price) + ":" + (s.only || ""); }).join(",") : "";
   var bn = Array.isArray(m.beans) ? m.beans.map(function(b){ return String(b.label) + ":" + Number(b.add); }).join(",") : "";
-  var op = (m.opt && typeof m.opt === "object") ? ((m.opt.sweet !== false) + "/" + (m.opt.ice !== false) + "/" + (m.opt.toppings !== false)) : "";
+  var op = (m.opt && typeof m.opt === "object") ? ((m.opt.sweet !== false) + "/" + (validSweetDefault(m.opt.sweetDefault) || "") + "/" + (m.opt.ice !== false) + "/" + (m.opt.toppings !== false)) : "";
   return sz + "|" + bn + "|" + op;
 }
 function menuExtraDiffers(a, b){ return menuExtraSig(a) !== menuExtraSig(b); }
@@ -1926,7 +1944,7 @@ function sanitizeOverrideMenu(m){
     name: m.name.trim(), price: price, priceIce: numOrNull(m.priceIce), priceHot: numOrNull(m.priceHot),
     tempType: ["both","ice","hot","none"].indexOf(m.tempType) >= 0 ? m.tempType : "both",
     cat: typeof m.cat === "string" && m.cat.trim() ? m.cat.trim() : "음료" };
-  if (m.opt && typeof m.opt === "object") out.opt = { sweet: !!m.opt.sweet, ice: !!m.opt.ice, toppings: !!m.opt.toppings };
+  if (m.opt && typeof m.opt === "object"){ var _sd = !!m.opt.sweet ? validSweetDefault(m.opt.sweetDefault) : null; out.opt = { sweet: !!m.opt.sweet, ice: !!m.opt.ice, toppings: !!m.opt.toppings }; if (_sd) out.opt.sweetDefault = _sd; }
   if (Array.isArray(m.sizes)){
     var szs = m.sizes.filter(function(s){ return s && s.label && !isNaN(Number(s.price)); })
       .map(function(s){ var o = { label: String(s.label), price: Number(s.price) }; if (s.only === "hot" || s.only === "ice") o.only = s.only; return o; });
@@ -2950,13 +2968,26 @@ function itemLabel(it, hideNote){ var s = itemSuffix(it, hideNote); return it.na
    단일 규격 음료(시그니처·크러쉬 등)도 당도·토핑은 고를 수 있어 그대로 두고,
    얼음양만 온도 구분이 있을 때 고른다.
    HOT을 고르면 얼음양을 숨기는 건 온도 기준이라 팝업에서 따로 처리한다. */
+var GC_SWEET_VALUES = ["0%", "30%", "50%", "70%", "100%"];
+function validSweetDefault(v){ return GC_SWEET_VALUES.indexOf(String(v || "")) >= 0 ? String(v) : null; }
+function normalizeSweetDefault(v){ return validSweetDefault(v) || "50%"; }
+/* 메뉴에 저장된 기본 당도 — 당도가 꺼져 있거나(없음) 유효한 기본값이 없으면 null.
+   구버전 메뉴(sweet만 있고 sweetDefault가 없음)는 기본값이 없는 것으로 본다:
+   주문 팝업에서는 종전 기본값 50%로 뜨지만, 메뉴 표시 배지는 붙지 않는다.
+   가게 관리에서 한 번 저장하면 sweetDefault가 명시돼 배지가 붙는다 */
+function menuSweetDefault(menu){
+  if (!menu || !menu.opt || typeof menu.opt !== "object") return null;
+  if (menu.opt.sweet === false) return null;
+  return validSweetDefault(menu.opt.sweetDefault);
+}
 function defaultOptRules(cat, tt){
-  if (/스무디|smoothie/i.test(String(cat || ""))) return { sweet:false, ice:false, toppings:true };
-  return { sweet:true, ice: tt !== "none", toppings:true };
+  if (/스무디|smoothie/i.test(String(cat || ""))) return { sweet:false, sweetDefault:null, ice:false, toppings:true };
+  return { sweet:true, sweetDefault:null, ice: tt !== "none", toppings:true };
 }
 function menuOptRules(menu){
   if (menu && menu.opt && typeof menu.opt === "object"){
-    return { sweet: menu.opt.sweet !== false, ice: menu.opt.ice !== false, toppings: menu.opt.toppings !== false };
+    var sweetOn = menu.opt.sweet !== false;
+    return { sweet: sweetOn, sweetDefault: sweetOn ? validSweetDefault(menu.opt.sweetDefault) : null, ice: menu.opt.ice !== false, toppings: menu.opt.toppings !== false };
   }
   return defaultOptRules(menuCat(menu), menu ? menu.tempType : "");
 }
@@ -5300,7 +5331,7 @@ function cartBreakdown(menuId){
 var _menuRowBase = { key:"", h:0, w:0 };
 function menuRowBaseKey(rs){
   var s = "";
-  rs.menus.forEach(function(m){ s += m.id + "|" + (m.name || "") + "|" + priceText(m) + "|" + (m.tempType || "") + ";"; });
+  rs.menus.forEach(function(m){ s += m.id + "|" + (m.name || "") + "|" + priceText(m) + "|" + (m.tempType || "") + "|" + (menuSweetDefault(m) || "") + ";"; });
   var h = 0; for (var i = 0; i < s.length; i++){ h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
   return String(rs.id || rs.name || "") + "|" + rs.menus.length + "|" + h;
 }
@@ -5437,8 +5468,10 @@ function renderMenuArea(){
       : (qty > 0
         ? '<span class="ministep"><button type="button" data-dec="' + esc(m.id) + '" aria-label="수량 줄이기"' + dis + '>−</button><span class="qv">' + qty + '</span><button type="button" data-inc="' + esc(m.id) + '" aria-label="수량 늘리기"' + dis + '>+</button></span>'
         : '<button type="button" class="addbtn" data-add="' + esc(m.id) + '" aria-label="' + esc(m.name) + ' 담기"' + dis + '>＋</button>');
+    var sweetDef = isGc ? menuSweetDefault(m) : null;
     return '<div class="mrow' + (totalQty>0 ? " in-cart" : "") + (blocked ? " blocked" : "") + '">'
       + '<div class="minfo"><div class="mname">' + esc(m.name) + '</div><div class="mprice">' + esc(priceText(m)) + '</div>'
+      + (sweetDef ? '<div><span class="sweetbadge">당도 ' + esc(sweetDef) + "</span></div>" : "")
       + (totalQty > 0 && (m.tempType === "both" || isGc || menuSizes(m) || fixedSize(m) || menuBeans(m)) ? '<div class="mnote">장바구니: ' + esc(cartBreakdown(m.id)) + "</div>" : "")
       + note + "</div>"
       + tempCtl
@@ -5956,7 +5989,9 @@ function openGongchaModal(menu){
     Array.prototype.forEach.call(document.querySelectorAll('input[name="' + name + '"]'), function(r){ r.checked = r.value === val; });
   }
   setRadio("gcTemp", ui.tempSel[menu.id] === "HOT" ? "HOT" : "ICE");
-  setRadio("gcSweet", "50%");
+  /* 당도 선택기는 메뉴에 저장된 기본 당도로 처음 뜬다 (기본값이 없는 구버전 메뉴는 종전대로 50%).
+     당도가 ‘없음’인 메뉴는 아래에서 섹션 자체를 숨긴다 */
+  setRadio("gcSweet", (gcSel.rules && gcSel.rules.sweetDefault) || "50%");
   setRadio("gcIce", "보통");
   $("gcTempWrap").classList.toggle("hidden", menu.tempType !== "both");
   /* 메뉴별 규칙에 따라 안 쓰는 옵션 섹션은 아예 숨긴다 (예: 스무디는 토핑만) */
@@ -5975,7 +6010,7 @@ function openGongchaModal(menu){
   /* 샷추가는 커피 카테고리 메뉴에만 보인다 */
   $("gcShotWrap").classList.toggle("hidden", menuCat(menu) !== "커피");
   $("gcTitle").textContent = menu.name + " — 옵션 선택";
-  $("gcBasePrice").textContent = "기본 가격 " + priceText(menu) + " · 토핑·샷은 앱 가격 그대로 더해져요";
+  $("gcBasePrice").textContent = "기본 가격 " + priceText(menu) + (gcSel.rules.sweetDefault ? " · 기본 당도 " + gcSel.rules.sweetDefault : "") + " · 토핑·샷은 앱 가격 그대로 더해져요";
   $("gongchaModal").classList.remove("hidden");
   _trackModalOpen("gongchaModal");
   updateGcModal();
@@ -5993,7 +6028,7 @@ $("gcAddBtn").addEventListener("click", function(){
   if (v){ toast(v); return; }
   var rules = gcSel.rules || menuOptRules(menu);
   var tops = rules.toppings ? gcToppingsSelected().map(function(t){ return t[0]; }) : [];
-  var opts = { toppings: tops, sweet: rules.sweet ? (gcChecked("gcSweet") || "50%") : null,
+  var opts = { toppings: tops, sweet: rules.sweet ? (gcChecked("gcSweet") || rules.sweetDefault || "50%") : null,
     ice: isFixedIceMenu(menu) ? "보통" : ((rules.ice && temp !== "HOT" && menu.tempType !== "none") ? (gcChecked("gcIce") || "보통") : null) };
   /* 샷추가는 커피 카테고리에서 고른 개수만 옵션에 싣는다 (가격은 단가에 이미 더해졌다) */
   if (menuCat(menu) === "커피" && gcSel.shots) opts.shots = gcSel.shots;
@@ -7038,7 +7073,9 @@ function renderManageMenus(){
   if (!s){ el.innerHTML = '<div class="empty"><strong>가게가 없어요</strong>먼저 가게를 추가하세요.</div>'; return; }
   if (!s.menus || !s.menus.length){ el.innerHTML = '<div class="empty"><strong>‘' + esc(s.name) + '’ 메뉴가 없어요</strong>아래 ‘새 메뉴 추가’ 버튼을 눌러 팝업에서 첫 메뉴를 추가하세요.</div>'; return; }
   function menuRow(m){
+    var sd = isGongchaStore(s) ? menuSweetDefault(m) : null;
     return '<div class="listrow"><div class="main"><span class="who">' + esc(m.name) + '</span> <span class="catbadge">' + esc(menuCat(m)) + '</span> <span class="tempbadge">' + tempTypeText(m.tempType) + '</span>'
+      + (sd ? ' <span class="sweetbadge">당도 ' + esc(sd) + "</span>" : "")
       + '<div class="detail">' + esc(priceText(m)) + '</div></div>'
       + '<span class="btnrow"><button type="button" class="btn small" data-editmenu="' + esc(m.id) + '">편집</button>'
       + '<button type="button" class="btn small danger" data-delmenu="' + esc(m.id) + '">삭제</button></span></div>';
@@ -7819,27 +7856,59 @@ function syncOptIceField(){
   var lbl = chk.closest ? chk.closest("label") : null;
   if (lbl) lbl.style.opacity = noTemp ? ".45" : "";
 }
+function sweetModeOf(){
+  var r = document.querySelector('input[name="optSweetMode"]:checked');
+  return r ? r.value : "default";
+}
+function setSweetMode(v){
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="optSweetMode"]'), function(r){ r.checked = (r.value === v); });
+  syncSweetDefaultVisibility();
+}
+function sweetDefaultFormValue(){
+  var r = document.querySelector('input[name="optSweetDefault"]:checked');
+  return normalizeSweetDefault(r ? r.value : "50%");
+}
+function setSweetDefaultFormValue(v){
+  var val = normalizeSweetDefault(v);
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="optSweetDefault"]'), function(r){ r.checked = (r.value === val); });
+}
+function syncSweetDefaultVisibility(){
+  var w = $("optSweetDefaultWrap"); if (!w) return;
+  w.classList.toggle("hidden", sweetModeOf() === "none");
+}
+Array.prototype.forEach.call(document.querySelectorAll('input[name="optSweetMode"]'), function(r){
+  r.addEventListener("change", syncSweetDefaultVisibility);
+});
 function applyOptDefaults(){
   if (!manageStoreIsGongcha()) return;
   var d = defaultOptRules(menuCatValue(), selectedTempType());
-  $("optSweetChk").checked = d.sweet;
+  /* 새 메뉴·카테고리 변경 시: 당도를 고를 수 있는 카테고리면 ‘기본값’(기존에 골라 둔 값 유지, 없으면 50%),
+     스무디처럼 고정인 카테고리면 ‘없음’으로 맞춘다 */
+  if (d.sweet){ setSweetMode("default"); if (!document.querySelector('input[name="optSweetDefault"]:checked')) setSweetDefaultFormValue("50%"); }
+  else setSweetMode("none");
   $("optIceChk").checked = d.ice;
   $("optTopChk").checked = d.toppings;
   syncOptIceField();
+  syncSweetDefaultVisibility();
 }
 function fillOptForm(menu){
   syncMenuOptSection();
   if (!manageStoreIsGongcha()) return;
   var r = menuOptRules(menu);
-  $("optSweetChk").checked = r.sweet;
+  if (r.sweet){ setSweetMode("default"); setSweetDefaultFormValue(r.sweetDefault || "50%"); }
+  else setSweetMode("none");
   $("optIceChk").checked = r.ice;
   $("optTopChk").checked = r.toppings;
   syncOptIceField();
+  syncSweetDefaultVisibility();
 }
 function optFormValue(){
-  return { sweet: !!$("optSweetChk").checked,
+  var hasSweet = sweetModeOf() !== "none";
+  var out = { sweet: hasSweet,
     ice: !!$("optIceChk").checked && selectedTempType() !== "none",
     toppings: !!$("optTopChk").checked };
+  if (hasSweet) out.sweetDefault = sweetDefaultFormValue();
+  return out;
 }
 Array.prototype.forEach.call(document.querySelectorAll('input[name="tempType"]'), function(r){
   r.addEventListener("change", function(){
