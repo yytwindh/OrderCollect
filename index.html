@@ -192,10 +192,13 @@
       .ministep button{width:28px;height:28px;min-height:28px;border-radius:50%;border:0;background:var(--surface);color:var(--accent);font-size:16px;font-weight:800;line-height:1;padding:0;cursor:pointer}
       .ministep button:disabled{opacity:.45;cursor:not-allowed}
       .ministep .qv{min-width:20px;text-align:center;font-weight:800;font-size:14.5px;color:var(--accent)}
-      .stepper{width:100%;display:inline-flex;align-items:center;justify-content:space-between;border:1.5px solid var(--accent);border-radius:999px;overflow:hidden;background:var(--surface)}
-      .stepper button{width:32px;height:40px;min-height:40px;border:0;background:transparent;font-size:18px;font-weight:800;color:var(--accent);flex:none;padding:0}
+      /* 장바구니 수량 스테퍼 — 작고 가벼운 알약형: 연한 틸 배경에 작은 동그란 버튼,
+         숫자는 크기를 유지해 잘 보이게 하고 행 높이는 낮춰 덜 답답하게 한다 */
+      .stepper{display:inline-flex;align-items:center;gap:2px;background:var(--accent-soft);border:1px solid var(--line);border-radius:999px;padding:3px;flex:none}
+      .stepper button{width:26px;height:26px;min-height:26px;border-radius:50%;border:0;background:var(--surface);color:var(--accent);font-size:15px;font-weight:800;line-height:1;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none}
       .stepper button:disabled{opacity:.45;cursor:not-allowed}
-      .stepper .qv{flex:1 1 auto;text-align:center;font-weight:800;font-size:15.5px}
+      .stepper .qv{min-width:22px;text-align:center;font-weight:800;font-size:15px;color:var(--ink);line-height:1;padding:0 1px}
+      .cart-stepper{align-self:center}
       /* 샷 스테퍼 — 사이즈·원두 팝업에서 절대 개수(기본 샷 ± 증감)를 숫자로 보여준다.
          왼쪽에는 기본 개수와 현재 증감·추가금을, 오른쪽에는 −/숫자/+를 둔다 */
       .shotstep-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -443,12 +446,20 @@
         .order-sidebar{margin-top:10px}
         body.order-mode .wrap{padding-bottom:104px}
         .mobile-cart-bar{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:55;
-          display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;
+          display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;
           box-shadow:0 10px 28px rgba(15,118,110,.18);padding:10px 12px}
         .mobile-cart-bar .mcb-info{flex:1 1 auto;min-width:0}
-        .mobile-cart-bar .mcb-label{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.2}
+        .mobile-cart-bar .mcb-label{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .mobile-cart-bar .mcb-value{font-size:16.5px;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .mobile-cart-bar .btn{flex:none}
+        .mobile-cart-bar .btn{flex:none;padding-left:13px;padding-right:13px}
+        /* 하단 바 이름 칩 — 선택됐으면 민트에 이름, 안 골랐으면 노랑에 ‘이름 선택’.
+           누르면 이름 선택 카드로 이동한다. 화살표는 두지 않는다 */
+        .mcb-name-chip{flex:0 1 auto;max-width:96px;min-width:0;min-height:36px;border-radius:999px;padding:6px 11px;
+          font-size:13px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+        .mcb-name-chip.is-selected{background:var(--mint);border:1px solid var(--line-strong);color:var(--green-text)}
+        .mcb-name-chip.is-empty{background:var(--stat-pending-bg);border:1px solid var(--stat-pending-line);color:var(--stat-pending-text)}
+        .mcb-name-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+        @media (max-width:380px){ .mobile-cart-bar .btn{padding-left:10px;padding-right:10px;font-size:13.5px} .mcb-name-chip{max-width:82px;padding-left:9px;padding-right:9px} }
         body:not(.order-mode) .mobile-cart-bar{display:none}
         .mobile-cart-bar.hiddenbar{display:none}
       }
@@ -826,6 +837,7 @@
           <div class="mcb-label">내 장바구니 · <span id="mobileCartCount">0개</span></div>
           <div class="mcb-value" id="mobileCartTotal">0원</div>
         </div>
+        <button class="mcb-name-chip is-empty" id="mobileNameChip" type="button" aria-label="이름 선택으로 이동">이름 선택</button>
         <button class="btn primary" id="mobileCartBtn" type="button">장바구니 보기</button>
       </div>
 
@@ -5272,6 +5284,7 @@ function renderRoster(){
   if (!flat.length){
     area.innerHTML = '<div class="empty"><strong>아직 주문이 시작되지 않았어요</strong></div>';
     updateSkipNote();
+    if (typeof updateMobileNameChip === "function") updateMobileNameChip();
     return;
   }
   var blocks = rosterFor(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
@@ -5311,6 +5324,7 @@ function renderRoster(){
     });
   });
   updateSkipNote();
+  if (typeof updateMobileNameChip === "function") updateMobileNameChip();
 }
 
 /* 장바구니 키: ICE·HOT 둘 다인 메뉴는 온도별로 항목을 나눈다 (가격이 다를 수 있어서) */
@@ -5640,7 +5654,7 @@ function renderCart(){
   } else {
     list.innerHTML = items.map(function(it, idx){
       /* 공차 옵션·사이즈·원두·샷 항목은 조합별로 나뉘어 있어, 수량 조절도 장바구니에서 항목 단위로 한다 */
-      var ctl = (it.opts || it.size || it.bean || it.shots) ? '<span class="stepper" style="width:118px;flex:none"><button type="button" data-gc-dec="' + esc(keys[idx]) + '" aria-label="수량 줄이기">−</button><span class="qv">' + it.qty + '</span><button type="button" data-gc-inc="' + esc(keys[idx]) + '" aria-label="수량 늘리기">+</button></span>' : "";
+      var ctl = (it.opts || it.size || it.bean || it.shots) ? '<span class="stepper cart-stepper"><button type="button" data-gc-dec="' + esc(keys[idx]) + '" aria-label="수량 줄이기">−</button><span class="qv">' + it.qty + '</span><button type="button" data-gc-inc="' + esc(keys[idx]) + '" aria-label="수량 늘리기">+</button></span>' : "";
       /* 요청사항 메모 — 모든 가게·모든 메뉴의 항목마다 자유롭게 적는다.
          휘핑·콜드폼·시럽·얼음 양·드리즐처럼 구조화되지 않은 요청용이며,
          메모로 적은 옵션의 추가 금액은 자동 계산하지 않는다.
@@ -5701,6 +5715,7 @@ function renderCart(){
   var mCountEl = $("mobileCartCount"), mTotalEl = $("mobileCartTotal");
   if (mCountEl) mCountEl.textContent = items.reduce(function(a,it){ return a + it.qty; }, 0) + "개";
   if (mTotalEl) mTotalEl.textContent = won(tot);
+  if (typeof updateMobileNameChip === "function") updateMobileNameChip();
 }
 /* 제출된 주문을 삭제하고 그 메뉴를 장바구니로 되돌린다 — 고쳐서 다시 제출할 수 있게 */
 function restoreOrderToCart(orderId){
@@ -7569,10 +7584,23 @@ $("channelModalBackdrop").addEventListener("click", function(){ closeChannelModa
 /* 이름 선택은 ‘이름 선택’ 카드의 칩이 맡는다 — 칩 클릭 연결은 renderRoster가 그릴 때마다 붙인다.
    팝업·스트립·취소 버튼은 없다. 내 주문 취소는 장바구니 아래 ‘내 주문’ 카드에서 한다 */
 
-/* 이름을 안 고른 채 제출·Skip을 누르면 경고와 함께 ‘이름 선택’ 카드로 바로 이동한다 —
-   메뉴를 담느라 아래로 내려간 상태에서도 다시 쭉 올릴 필요 없이 칩을 바로 누를 수 있게 한다 */
-function guideToNameSelect(){
-  toast("먼저 이름을 선택해 주세요.");
+/* 하단 장바구니 바 이름 칩 — 선택된 이름이 있으면 민트 칩에 그 이름을,
+   없으면 노란 칩에 ‘이름 선택’을 보여준다. renderRoster·renderCart가 불릴 때마다 맞춘다 */
+function updateMobileNameChip(){
+  var chip = $("mobileNameChip"); if (!chip) return;
+  var has = !!(ui.myName && String(ui.myName).trim());
+  if (has){
+    chip.textContent = ui.myName;
+    chip.classList.add("is-selected"); chip.classList.remove("is-empty");
+    chip.setAttribute("aria-label", "현재 이름 " + ui.myName + " · 이름 선택으로 이동");
+  } else {
+    chip.textContent = "이름 선택";
+    chip.classList.add("is-empty"); chip.classList.remove("is-selected");
+    chip.setAttribute("aria-label", "이름 선택으로 이동");
+  }
+}
+/* ‘이름 선택’ 카드로 부드럽게 이동하고 도착 지점을 잠깐 강조한다 */
+function scrollToNameSelectCard(){
   var el = $("nameSelectCard") || $("nameSelectArea");
   if (!el) return;
   var reduce = false;
@@ -7582,6 +7610,13 @@ function guideToNameSelect(){
   void el.offsetWidth;
   el.classList.add("flash");
   setTimeout(function(){ el.classList.remove("flash"); }, 1800);
+}
+
+/* 이름을 안 고른 채 제출·Skip을 누르면 경고와 함께 ‘이름 선택’ 카드로 바로 이동한다 —
+   메뉴를 담느라 아래로 내려간 상태에서도 다시 쭉 올릴 필요 없이 칩을 바로 누를 수 있게 한다 */
+function guideToNameSelect(){
+  toast("먼저 이름을 선택해 주세요.");
+  scrollToNameSelectCard();
 }
 
 /* 본인 Skip (주문 화면에서 각자) */
@@ -7680,6 +7715,8 @@ window.addEventListener("resize", function(){
 });
 var _mcbBtn = $("mobileCartBtn");
 if (_mcbBtn) _mcbBtn.addEventListener("click", function(){ var cc = $("cartCard"); if (cc) cc.scrollIntoView({ behavior:"smooth", block:"center" }); });
+var _mcbNameChip = $("mobileNameChip");
+if (_mcbNameChip) _mcbNameChip.addEventListener("click", function(){ scrollToNameSelectCard(); });
 
 /* store form — 가게 추가·편집 + 카테고리·메뉴 통합 팝업 (채널 설정 팝업과 같은 방식) */
 function resetStoreForm(){
