@@ -73,7 +73,6 @@
       .dot.on{background:var(--green)} .dot.busy{background:var(--accent);animation:dotpulse 1.2s ease-in-out infinite}
       @keyframes dotpulse{0%,100%{opacity:1}50%{opacity:.3}}
       @media (prefers-reduced-motion: reduce){ .dot.busy{animation:none} }
-      #orderConnHint{font-size:12.5px;color:var(--muted)}
       .tabs{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0;margin-top:4px}
       .tabs-inner{display:flex;flex-wrap:wrap;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
       .tab{flex:1 1 100px;border:0;background:transparent;color:var(--muted);border-radius:999px;padding:8px;font-weight:800;font-size:14.5px;min-height:42px}
@@ -785,7 +784,6 @@
               </div>
               <div id="myOrderBody"></div>
               <p class="hint hidden" id="myOrderLimitNote"></p>
-              <p class="hint hidden" id="orderConnHint" role="status"></p>
             </div>
 
             <div class="card" id="submittedCard">
@@ -3026,16 +3024,6 @@ function fsNextSeq(){ return ++fsSeqCounter; }
 var bcChannel = null;
 try { bcChannel = new BroadcastChannel("jumun-cwihab-state-v1"); } catch(e){ bcChannel = null; }
 var syncConnected = false, syncPhase = "connecting";
-function refreshOrderHint(){
-  var hint = $("orderConnHint"); if (!hint) return;
-  /* 즉석 주문은 연결이 끊긴 동안에는 공유되지 않으므로, 내 주문 카드 아래에 연결 상태를 조용히 알려준다 */
-  if (!syncConnected){
-    hint.textContent = syncPhase === "reconnecting" ? "다시 연결하는 중…" : syncPhase === "failed" ? "연결 실패" : "연결하는 중…";
-    hint.classList.remove("hidden");
-  } else {
-    hint.textContent = ""; hint.classList.add("hidden");
-  }
-}
 function setSync(mode, text){
   var phase;
   if (mode === "on") phase = "connected";
@@ -3047,7 +3035,6 @@ function setSync(mode, text){
   var ss = $("syncStatus"); if (ss) ss.setAttribute("data-state", phase);
   /* 상태 문구는 단계별 짧은 문구로 고정한다 — 긴 설명 문장은 표시하지 않는다 */
   var st = $("syncText"); if (st) st.textContent = phase === "connected" ? "연결됨" : phase === "connecting" ? "연결하는 중…" : phase === "failed" ? "연결 실패" : "다시 연결하는 중…";
-  refreshOrderHint();
 }
 function sha256hex(text){
   if (window.crypto && crypto.subtle && crypto.subtle.digest){
