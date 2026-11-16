@@ -430,6 +430,26 @@
       .catrow + .catrow{margin-top:8px}
       .catrow .cname{font-weight:800;font-size:15px}
       .catrow .ccount{color:var(--muted);font-size:13px;font-weight:700;margin-left:6px}
+      /* 관리 목록 메뉴 행 — 이름·가격 한 줄 + 아래 작은 알약 버튼 줄 (복사·↑·↓·숨김·편집·삭제) */
+      .mmenu-top{display:flex;align-items:baseline;gap:8px}
+      .mmenu-top .who{flex:1 1 auto;min-width:0}
+      .mmenu-price{flex:none;font-weight:800;font-size:14.5px;white-space:nowrap}
+      .mmenu-row.is-hidden .who,.mmenu-row.is-hidden .mmenu-price{opacity:.45}
+      .hiddenbadge{flex:none;font-size:11.5px;font-weight:800;color:var(--muted);background:var(--chip);border-radius:999px;padding:3px 9px;white-space:nowrap}
+      .mactrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+      .mact{border:1px solid var(--line);background:var(--accent-soft);color:var(--green-text);border-radius:999px;padding:5px 13px;font-size:13px;font-weight:800;min-height:32px;cursor:pointer;line-height:1.2}
+      .mact.grey{background:var(--chip);color:var(--muted)}
+      .mact.danger{background:var(--danger-soft);color:var(--danger)}
+      .mact:disabled{opacity:.38;cursor:not-allowed}
+      .mact:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+      /* 메뉴 추가 — ‘다음 메뉴 계속 추가’ 체크 */
+      .menucontinue{display:inline-flex;align-items:center;gap:9px;font-size:15px;font-weight:800;cursor:pointer;min-height:40px}
+      .menucontinue input{width:21px;height:21px;accent-color:var(--accent);flex:none}
+      /* 카테고리 삭제 — 메뉴 일괄 이동 패널 */
+      .catdel-panel{border:1.5px solid var(--line-strong);border-radius:16px;padding:12px;background:var(--surface);margin-top:8px}
+      .catdel-title{font-weight:800;font-size:15px}
+      .catdel-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:14.5px;font-weight:700}
+      .catdel-select{flex:1 1 150px;width:auto}
       .menugrouphead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
       .menugrouphead h3{display:flex;align-items:baseline;gap:8px}
       .menugrouphead h3 .gsum{color:var(--muted);font-size:13px;font-weight:700}
@@ -898,7 +918,6 @@
             <input class="field" id="menuPriceHot" type="number" inputmode="numeric" min="0" step="100" placeholder="5000" />
           </div>
         </div>
-        <p class="hint hidden" id="priceDualHint">ICE·HOT 가격을 따로 정할 수 있어요.<br />HOT을 비우면 ICE와 같게 들어갑니다.</p>
         <div class="mt">
           <span class="flabel">제품 구분 (카테고리)</span>
           <div class="radiochips" id="menuCatChips" role="radiogroup" aria-label="제품 구분"></div>
@@ -920,7 +939,6 @@
              기본값이 있으면 주문 팝업에서 그 값이 처음 선택돼 있고, 주문 화면 메뉴에도 작게 표시된다 -->
         <div class="mt hidden" id="menuOptWrap">
           <span class="flabel">옵션 설정 (공차 메뉴)</span>
-          <p class="hint" style="margin:2px 0 8px">주문 팝업에 보여줄 항목이에요.<br />카테고리를 바꾸면 기본값이 다시 맞춰집니다.</p>
           <span class="flabel">당도</span>
           <div class="radiochips" role="radiogroup" aria-label="당도 설정">
             <label><input type="radio" name="optSweetMode" value="none" /> 없음</label>
@@ -935,7 +953,6 @@
               <label><input type="radio" name="optSweetDefault" value="70%" /> 70%</label>
               <label><input type="radio" name="optSweetDefault" value="100%" /> 100%</label>
             </div>
-            <p class="hint">주문할 때 당도 선택기가 이 값으로 처음 뜨고, 메뉴에도 작게 “당도 30%”처럼 표시돼요. “없음”이면 당도 선택 자체가 안 떠요.</p>
           </div>
           <div class="radiochips" style="margin-top:10px">
             <label><input type="checkbox" id="optIceChk" /> 얼음양 선택 가능</label>
@@ -962,7 +979,6 @@
               <input class="field" id="menuGcSizeJ" type="number" inputmode="numeric" min="0" step="10" placeholder="4560" />
             </div>
           </div>
-          <p class="hint">없음은 가격 하나로 등록돼요. L만·J만은 가격 하나만 넣으면 사이즈 선택 없이 그 사이즈로 고정돼 담겨요 (예: 납작복숭아는 J만).<br />L+J는 L·J 가격을 각각 넣고 주문할 때 골라요. 사이즈 가격이 메뉴 기본 가격이 됩니다.</p>
         </div>
         <!-- 뚜레쥬르 사이즈 (REGULAR · LARGE) — 없음 / REGULAR만 / LARGE만 / REGULAR+LARGE 네 가지.
              하나만 있는 메뉴는 사이즈 선택 팝업 없이 그 사이즈로 고정돼 담긴다 -->
@@ -984,7 +1000,6 @@
               <input class="field" id="menuTousSizeL" type="number" inputmode="numeric" min="0" step="100" placeholder="3800" />
             </div>
           </div>
-          <p class="hint">없음은 가격 하나로 등록돼요. REGULAR만·LARGE만은 가격 하나만 넣으면 사이즈 선택 없이 그 사이즈로 고정돼 담겨요 (예: 자몽에이드·레몬에이드는 LARGE만).<br />REGULAR+LARGE는 가격을 각각 넣고 주문할 때 골라요. 사이즈 가격이 메뉴 기본 가격이 됩니다.</p>
         </div>
         <!-- 스타벅스 사이즈·원두 — ‘전체’는 입력한 가격을 Tall 기준으로 보고 나머지 사이즈를
              정해진 차액으로 자동 계산하고, Short만·Tall만처럼 하나만 고르면 입력한 가격이
@@ -1004,12 +1019,11 @@
             <label><input type="checkbox" id="menuSbBeanUse" /> 원두 선택 사용</label>
           </div>
           <div class="sizepreview" id="menuSbPreview" aria-live="polite"></div>
-          <p class="hint">‘전체’는 입력한 가격을 Tall 가격으로 보고 Short −800원(HOT 전용), Grande +600원, Venti +1,400원, Trenta +2,200원(아이스 전용·해당 음료만)으로 자동 계산돼요.<br />Short만·Tall만처럼 하나만 고르면 입력한 가격이 그 사이즈 가격이 되고, 사이즈 선택 없이 그 사이즈로 고정돼 담겨요.<br />원두는 시그니처·블론드 추가금 없음, 디카페인·1/2 디카페인은 +300원이에요. 음식·병음료는 사이즈 ‘없음’으로 두고 원두도 끄세요.</p>
         </div>
-        <!-- 메가커피·폴바셋 안내 — 이 두 가게는 사이즈·옵션 없이 단일 가격이라 추가 입력란이 없다 -->
-        <div class="mt hidden" id="menuSimpleHintWrap">
-          <p class="hint" id="menuSimpleHint" style="background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:9px 12px"></p>
+        <div class="mt" id="menuContinueWrap">
+          <label class="menucontinue"><input type="checkbox" id="menuContinueChk" /> 다음 메뉴 계속 추가</label>
         </div>
+        <p class="form-error hidden" id="menuFormError" role="alert"></p>
         <div class="btnrow mt">
           <button class="btn primary" id="menuSaveBtn" type="button">메뉴 추가</button>
           <button class="btn ghost" id="menuCancelBtn" type="button">취소</button>
@@ -1129,7 +1143,6 @@
         <div class="modal-head">
           <div>
             <h3 id="storeFormTitle">새 가게 추가</h3>
-            <p class="hint" style="margin-top:4px">가게·카테고리·메뉴를 한곳에서 편집해요.<br />메뉴 ‘편집’을 누르면 메뉴 팝업이 떠요.</p>
           </div>
           <button class="modal-close" id="storeModalCloseBtn" type="button" aria-label="팝업 닫기">×</button>
         </div>
@@ -1156,13 +1169,12 @@
           <button class="btn primary" id="storeSaveBtn" type="button">가게 추가</button>
           <button class="btn ghost" id="storeCancelBtn" type="button">닫기</button>
         </div>
-        <p class="hint" id="storeMenuHint">가게를 먼저 저장하면, 이 팝업 안에서 바로 카테고리와 메뉴를 추가할 수 있어요.</p>
         <div id="storeMenuSection" class="hidden">
           <hr class="divider" />
           <h3>이 가게의 카테고리·메뉴</h3>
           <p class="hint" id="storeCountsLine" style="margin-top:4px" role="status" aria-live="polite"></p>
           <div class="mt">
-            <span class="flabel">카테고리 관리 — 메뉴를 묶어 보여줄 단위예요</span>
+            <span class="flabel">카테고리 관리</span>
             <div id="catList"></div>
             <div class="cataddrow" style="margin-top:8px">
               <input class="field" id="newCatName" type="text" lang="ko" inputmode="text" placeholder="새 카테고리 이름 — 예: 케이크, 샐러드" />
@@ -1170,10 +1182,9 @@
               <button class="btn ghost hidden" id="cancelCatEditBtn" type="button">취소</button>
             </div>
             <div id="catPresetRow" style="margin-top:8px"></div>
-            <p class="hint">이름을 바꾸면 속한 메뉴도 함께 바뀝니다.<br />채널에서 카테고리별 수량 제한을 걸 수 있어요.</p>
           </div>
           <div class="mt" id="manageMenuSearchWrap">
-            <label class="flabel" for="manageMenuSearch">메뉴 검색 — 편집할 메뉴를 바로 찾기</label>
+            <label class="flabel" for="manageMenuSearch">메뉴 검색</label>
             <input class="field" id="manageMenuSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
             <p class="hint hidden" id="manageMenuSearchResult" role="status" aria-live="polite"></p>
           </div>
@@ -2188,8 +2199,10 @@ function mergeMenuOverridesForSnap(L, R, equalMts, preferR){
 function visibleMenusForOrder(store){
   if (!store || !Array.isArray(store.menus)) return [];
   var spec = builtinSpecFor(store);
-  if (!spec) return store.menus.slice();
-  return store.menus.filter(function(m){ return !isMenuOverrideHidden(state, spec, m); });
+  return store.menus.filter(function(m){
+    if (m.hidden) return false;
+    return !(spec && isMenuOverrideHidden(state, spec, m));
+  });
 }
 /* 메뉴의 동일성은 내부 id가 아니라 (이름+카테고리)로 본다. 기본 메뉴 id는 예전에 스펙 순서로
    매겨져서(…-m12) 스펙을 전면 교체할 때마다 같은 id가 다른 메뉴를 가리키게 됐고(17부터는
@@ -2353,7 +2366,7 @@ var state = defaultState();
 /* session-only UI state (not shared) */
 var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", menuQuery:"", manageMenuQuery:"", menuCat:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
-           channelQuery:"", comboOpen:false, comboActive:-1,
+           channelQuery:"", comboOpen:false, comboActive:-1, catDel:null,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
            startSnap:null, startSnapFrozen:false, startSnapJson:"" };
 
@@ -6831,7 +6844,7 @@ function refreshStoreCounts(){
   });
   var ms = ui.manageStoreId ? storeById(ui.manageStoreId) : null;
   var line = $("storeCountsLine");
-  if (line) line.textContent = ms ? ("지금 메뉴 " + (ms.menus ? ms.menus.length : 0) + "개 · 카테고리 " + storeCategories(ms).length + "개 — 추가·삭제하면 바로 바뀝니다") : "";
+  if (line) line.textContent = ms ? ("메뉴 " + (ms.menus ? ms.menus.length : 0) + "개 · 카테고리 " + storeCategories(ms).length + "개") : "";
   if (!ms) return;
   function catCnt(c){ return (ms.menus || []).filter(function(m){ return menuCat(m) === c; }).length; }
   Array.prototype.forEach.call(document.querySelectorAll("[data-cat-count]"), function(el){
@@ -6957,11 +6970,29 @@ function renderCategoryManager(){
         + "</span></div>";
     }).join("");
   }
+  /* 삭제하려던 카테고리에 메뉴가 있으면, 옮길 카테고리를 고르는 패널을 목록 아래에 붙인다 */
+  var catDelName = null, catDelCnt = 0, catDelOthers = [];
+  if (ui.catDel && ui.catDel.storeId === s.id && cats.indexOf(ui.catDel.name) >= 0){
+    catDelName = ui.catDel.name;
+    catDelCnt = (s.menus || []).filter(function(m){ return menuCat(m) === catDelName; }).length;
+    catDelOthers = cats.filter(function(c){ return c !== catDelName; });
+    if (catDelCnt > 0){
+      listEl.innerHTML += '<div class="catdel-panel"><p class="catdel-title">‘' + esc(catDelName) + '’ 카테고리를 삭제할까요?</p>'
+        + '<div class="catdel-row"><span>메뉴 ' + catDelCnt + '개를</span>'
+        + '<select class="field catdel-select" id="catMoveTarget" aria-label="옮길 카테고리">'
+        + catDelOthers.map(function(c){ return '<option value="' + esc(c) + '">' + esc(c) + "</option>"; }).join("")
+        + '</select><span>로 이동</span></div>'
+        + '<div class="btnrow" style="margin-top:10px;justify-content:flex-end">'
+        + '<button type="button" class="btn" id="catDelCancelBtn">취소</button>'
+        + '<button type="button" class="btn primary" id="catDelConfirmBtn"' + (catDelOthers.length ? "" : " disabled") + '>삭제</button>'
+        + "</div></div>";
+    } else ui.catDel = null;
+  }
   /* 카테고리가 하나도 없는 새 가게는 음료·빵·케이크만 추천하고, 이미 카테고리가 있는
      가게는 아직 없는 자주 쓰는 카테고리를 추가 추천으로 보여준다 */
   var missing = (cats.length ? CAT_SUGGESTIONS : ["음료", "빵", "케이크"]).filter(function(c){ return cats.indexOf(c) < 0; });
   presetEl.innerHTML = missing.length
-    ? '<span class="flabel">자주 쓰는 카테고리 — 눌러서 바로 추가</span><div class="chips">'
+    ? '<span class="flabel">자주 쓰는 카테고리</span><div class="chips">'
       + missing.map(function(c){ return '<button type="button" class="chip" data-add-cat-preset="' + esc(c) + '">+ ' + esc(c) + "</button>"; }).join("") + "</div>"
     : "";
   Array.prototype.forEach.call(presetEl.querySelectorAll("[data-add-cat-preset]"), function(b){
@@ -6986,12 +7017,30 @@ function renderCategoryManager(){
     b.addEventListener("click", function(){
       var name = b.getAttribute("data-del-cat");
       var cnt = (s.menus || []).filter(function(m){ return menuCat(m) === name; }).length;
-      if (cnt > 0){ toast("‘" + name + "’ 카테고리에 메뉴가 " + cnt + "개 있어요. 메뉴를 다른 카테고리로 옮긴 뒤 지워 주세요."); return; }
+      /* 메뉴가 있는 카테고리는 바로 지우지 않고, 옮길 카테고리를 고르는 패널을 연다 */
+      if (cnt > 0){ ui.catDel = { storeId: s.id, name: name }; renderCategoryManager(); return; }
       if (Array.isArray(s.categories)) s.categories = s.categories.filter(function(c){ return c !== name; });
       if (ui.editCat && ui.editCat.storeId === s.id && ui.editCat.oldName === name){ ui.editCat = null; $("newCatName").value = ""; }
+      if (ui.catDel && ui.catDel.storeId === s.id && ui.catDel.name === name) ui.catDel = null;
       touch(); refreshStoreCounts(); /* 카테고리 개수를 즉시 맞춘다 */
       toast("카테고리 ‘" + name + "’를 지웠어요.");
     });
+  });
+  var catDelCancelBtn = listEl.querySelector("#catDelCancelBtn");
+  if (catDelCancelBtn) catDelCancelBtn.addEventListener("click", function(){
+    ui.catDel = null; renderCategoryManager();
+  });
+  var catDelConfirmBtn = listEl.querySelector("#catDelConfirmBtn");
+  if (catDelConfirmBtn) catDelConfirmBtn.addEventListener("click", function(){
+    if (!catDelName) return;
+    var targetSel = $("catMoveTarget");
+    var target = targetSel ? targetSel.value : "";
+    if (!target) return;
+    moveMenusToCategory(s, catDelName, target);
+    if (ui.editCat && ui.editCat.storeId === s.id && ui.editCat.oldName === catDelName){ ui.editCat = null; $("newCatName").value = ""; }
+    ui.catDel = null;
+    touch(); refreshStoreCounts();
+    toast("메뉴 " + catDelCnt + "개를 ‘" + target + "’(으)로 옮기고 카테고리를 지웠어요.");
   });
   Array.prototype.forEach.call(listEl.querySelectorAll("[data-addmenu-cat]"), function(b){
     b.addEventListener("click", function(){ startMenuInCategory(b.getAttribute("data-addmenu-cat")); });
@@ -7006,6 +7055,50 @@ function startMenuInCategory(cat){
   applySbDefaults();
   $("menuFormTitle").textContent = "새 메뉴 추가 — " + cat;
   openMenuModal();
+}
+/* 메뉴 숨김 — 기본 가게는 오버라이드 숨김 목록에, 직접 만든 가게는 메뉴 자체에 표시한다.
+   어느 쪽이든 주문 화면(visibleMenusForOrder)에서만 빠지고 관리 목록에는 남는다 */
+function menuIsHidden(s, m){
+  if (!m) return false;
+  if (m.hidden) return true;
+  var spec = builtinSpecFor(s);
+  return spec ? isMenuOverrideHidden(state, spec, m) : false;
+}
+function setMenuHidden(s, m, hide){
+  var spec = builtinSpecFor(s);
+  if (spec){
+    var ov = ensureStoreOverride(state, spec.id), key = menuIdentityKey(m);
+    if (hide){ if (ov.hidden.indexOf(key) < 0) ov.hidden.push(key); }
+    else ov.hidden = ov.hidden.filter(function(k){ return k !== key; });
+    if (m.hidden) delete m.hidden;
+  } else if (hide) m.hidden = true;
+  else if (m.hidden) delete m.hidden;
+  m.mts = Date.now();
+}
+/* 카테고리 삭제 때 메뉴를 다른 카테고리로 한 번에 옮긴다 — 기본 가게는 오버라이드 키도
+   함께 옮겨 숨김·가격 수정·추가 기록이 새 카테고리로 따라가게 한다 */
+function moveMenusToCategory(s, fromCat, toCat){
+  var spec = builtinSpecFor(s), wasHidden = {};
+  if (spec){
+    var ov0 = storeOverrideOf(state, spec.id);
+    if (ov0) ov0.hidden.forEach(function(k){ wasHidden[k] = 1; });
+  }
+  (s.menus || []).forEach(function(m){
+    if (menuCat(m) === fromCat){ m.cat = toCat; m.mts = Date.now(); }
+  });
+  if (spec){
+    migrateMenuOverrideCat(state, spec.id, fromCat, toCat);
+    var ov = ensureStoreOverride(state, spec.id);
+    (s.menus || []).forEach(function(m){
+      if (menuCat(m) !== toCat) return;
+      var oldKey = String(m.name || "") + "|" + fromCat, newKey = menuIdentityKey(m);
+      if (!builtinSpecKeySet(spec)[oldKey]) return;
+      if (ov.deleted.indexOf(oldKey) < 0) ov.deleted.push(oldKey);
+      if (!ov.added.some(function(x){ return menuIdentityKey(x) === newKey; })) upsertMenuOverrideAdded(state, spec, m);
+      if (wasHidden[oldKey] && ov.hidden.indexOf(newKey) < 0) ov.hidden.push(newKey);
+    });
+  }
+  if (Array.isArray(s.categories)) s.categories = s.categories.filter(function(c){ return c !== fromCat; });
 }
 function renderManageMenus(){
   var el = $("manageMenuList"), s = ui.manageStoreId ? storeById(ui.manageStoreId) : null;
@@ -7035,13 +7128,20 @@ function renderManageMenus(){
     el.innerHTML = '<div class="empty"><strong>검색 결과가 없어요</strong>‘' + esc((ui.manageMenuQuery || "").trim()) + '’에 맞는 메뉴가 없어요. 검색어를 바꿔 보세요.</div>';
     return;
   }
-  function menuRow(m){
-    var sd = isGongchaStore(s) ? menuSweetDefault(m) : null;
-    return '<div class="listrow"><div class="main"><span class="who">' + esc(m.name) + '</span> <span class="catbadge">' + esc(menuCat(m)) + '</span> <span class="tempbadge">' + tempTypeText(m.tempType) + '</span>'
-      + (sd ? ' <span class="sweetbadge">당도 ' + esc(sd) + "</span>" : "")
-      + '<div class="detail">' + esc(priceText(m)) + '</div></div>'
-      + '<span class="btnrow"><button type="button" class="btn small" data-editmenu="' + esc(m.id) + '">편집</button>'
-      + '<button type="button" class="btn small danger" data-delmenu="' + esc(m.id) + '">삭제</button></span></div>';
+  function menuRow(m, idxInCat, catCount){
+    var hid = menuIsHidden(s, m);
+    return '<div class="listrow mmenu-row' + (hid ? " is-hidden" : "") + '"><div class="main">'
+      + '<div class="mmenu-top"><span class="who">' + esc(m.name) + '</span>'
+      + (hid ? '<span class="hiddenbadge">숨김 중</span>' : "")
+      + '<span class="mmenu-price">' + esc(priceText(m)) + '</span></div>'
+      + '<div class="mactrow">'
+      + '<button type="button" class="mact" data-copymenu="' + esc(m.id) + '">복사</button>'
+      + '<button type="button" class="mact" data-movemenu="' + esc(m.id) + '" data-move-dir="-1"' + (idxInCat <= 0 ? " disabled" : "") + ' aria-label="위로 이동">↑</button>'
+      + '<button type="button" class="mact" data-movemenu="' + esc(m.id) + '" data-move-dir="1"' + (idxInCat >= catCount - 1 ? " disabled" : "") + ' aria-label="아래로 이동">↓</button>'
+      + '<button type="button" class="mact grey" data-hidemenu="' + esc(m.id) + '">' + (hid ? "보이기" : "숨김") + '</button>'
+      + '<button type="button" class="mact" data-editmenu="' + esc(m.id) + '">편집</button>'
+      + '<button type="button" class="mact danger" data-delmenu="' + esc(m.id) + '">삭제</button>'
+      + "</div></div></div>";
   }
   /* 저장된 메뉴를 카테고리별로 묶어서 보여준다 — 순서는 가게 카테고리 순서를 따른다.
      검색 중이면 visibleMenus(검색 결과)만 묶어, 맞는 카테고리만 남는다 */
@@ -7052,10 +7152,58 @@ function renderManageMenus(){
   el.innerHTML = order.map(function(c){
     return '<div class="menugroup"><div class="menugrouphead"><h3>' + esc(c) + ' <span class="gsum" data-group-count="' + esc(c) + '">메뉴 ' + byCat[c].length + '개</span></h3>'
       + '<button type="button" class="btn small" data-addmenu-cat="' + esc(c) + '">+ ' + esc(c) + ' 메뉴 추가</button></div>'
-      + byCat[c].map(menuRow).join("") + "</div>";
+      + byCat[c].map(function(m, i){ return menuRow(m, i, byCat[c].length); }).join("") + "</div>";
   }).join("");
   Array.prototype.forEach.call(el.querySelectorAll("[data-addmenu-cat]"), function(b){
     b.addEventListener("click", function(){ startMenuInCategory(b.getAttribute("data-addmenu-cat")); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-copymenu]"), function(b){
+    b.addEventListener("click", function(){
+      var s2 = storeById(ui.manageStoreId); if (!s2) return;
+      var m = null; s2.menus.forEach(function(x){ if (x.id===b.getAttribute("data-copymenu")) m = x; });
+      if (!m) return;
+      /* 복사 — 새 메뉴 폼에 원본 값을 그대로 채워 연다. 이름만 ‘복사본’을 붙여 바로 저장할 수 있게 한다 */
+      resetMenuForm();
+      ui.editMenuId = null;
+      $("menuName").value = m.name + " 복사본"; $("menuPrice").value = m.price;
+      $("menuPriceIce").value = priceFor(m, "ICE");
+      $("menuPriceHot").value = priceFor(m, "HOT");
+      renderMenuCatOptions(menuCat(m));
+      setMenuCat(menuCat(m));
+      var radiosC = document.querySelectorAll('input[name="tempType"]');
+      Array.prototype.forEach.call(radiosC, function(r){ r.checked = (r.value === m.tempType); });
+      syncPriceFields();
+      fillOptForm(m);
+      fillMenuStoreFields(m);
+      $("menuFormTitle").textContent = "메뉴 복사 — " + m.name; $("menuSaveBtn").textContent = "메뉴 추가";
+      openMenuModal();
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-movemenu]"), function(b){
+    b.addEventListener("click", function(){
+      var s2 = storeById(ui.manageStoreId); if (!s2 || !Array.isArray(s2.menus)) return;
+      var id = b.getAttribute("data-movemenu"), dir = Number(b.getAttribute("data-move-dir")) || 0;
+      var idx = -1; s2.menus.forEach(function(x, i){ if (x.id === id) idx = i; });
+      if (idx < 0 || !dir) return;
+      /* 순서는 같은 카테고리 안에서만 바꾼다 — 목록이 카테고리별로 묶여 보이기 때문이다 */
+      var cat = menuCat(s2.menus[idx]), j = idx + dir;
+      while (j >= 0 && j < s2.menus.length && menuCat(s2.menus[j]) !== cat) j += dir;
+      if (j < 0 || j >= s2.menus.length) return;
+      var tmp = s2.menus[idx]; s2.menus[idx] = s2.menus[j]; s2.menus[j] = tmp;
+      s2.menus[idx].mts = Date.now(); s2.menus[j].mts = Date.now();
+      touch();
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hidemenu]"), function(b){
+    b.addEventListener("click", function(){
+      var s2 = storeById(ui.manageStoreId); if (!s2) return;
+      var m = null; s2.menus.forEach(function(x){ if (x.id===b.getAttribute("data-hidemenu")) m = x; });
+      if (!m) return;
+      var nowHidden = !menuIsHidden(s2, m);
+      setMenuHidden(s2, m, nowHidden);
+      touch(); publishState();
+      toast(nowHidden ? "메뉴를 숨겼어요." : "메뉴를 다시 보이게 했어요.");
+    });
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-editmenu]"), function(b){
     b.addEventListener("click", function(){
@@ -7063,6 +7211,8 @@ function renderManageMenus(){
       var m = null; s2.menus.forEach(function(x){ if (x.id===b.getAttribute("data-editmenu")) m = x; });
       if (!m) return;
       ui.editMenuId = m.id; $("menuName").value = m.name; $("menuPrice").value = m.price;
+      var cw = $("menuContinueWrap"); if (cw) cw.classList.add("hidden");
+      hideMenuFormError();
       $("menuPriceIce").value = priceFor(m, "ICE");
       $("menuPriceHot").value = priceFor(m, "HOT");
       renderMenuCatOptions(menuCat(m));
@@ -7763,7 +7913,6 @@ function syncPriceFields(){
   var dual = selectedTempType() === "both";
   $("priceSingleWrap").classList.toggle("hidden", dual);
   $("priceDualWrap").classList.toggle("hidden", !dual);
-  $("priceDualHint").classList.toggle("hidden", !dual);
 }
 Array.prototype.forEach.call(document.querySelectorAll('input[name="tempType"]'), function(r){
   r.addEventListener("change", syncPriceFields);
@@ -8114,9 +8263,20 @@ function menuStoreFieldsValue(name, tt, basePrice){
   }
   return null; /* 사외·팝업스토어 등 — 가게별 입력란이 없어 기존 값을 건드리지 않는다 */
 }
+function showMenuFormError(msg){
+  var e = $("menuFormError"); if (!e) return;
+  e.textContent = msg; e.classList.remove("hidden");
+}
+function hideMenuFormError(){
+  var e = $("menuFormError"); if (!e) return;
+  e.textContent = ""; e.classList.add("hidden");
+}
 function resetMenuForm(){
   ui.editMenuId = null; $("menuName").value = ""; $("menuPrice").value = "";
   $("menuPriceIce").value = ""; $("menuPriceHot").value = "";
+  var cwR = $("menuContinueWrap"); if (cwR) cwR.classList.remove("hidden");
+  var ccR = $("menuContinueChk"); if (ccR) ccR.checked = false;
+  hideMenuFormError();
   Array.prototype.forEach.call(document.querySelectorAll('input[name="tempType"]'), function(r){ r.checked = (r.value === "both"); });
   syncPriceFields();
   renderMenuCatOptions();
@@ -8248,8 +8408,13 @@ $("openNewMenuBtn").addEventListener("click", function(){
 $("menuSaveBtn").addEventListener("click", function(){
   var s = ui.manageStoreId ? storeById(ui.manageStoreId) : null;
   if (!s){ toast("먼저 가게를 추가·선택하세요."); return; }
+  var wasEdit = !!ui.editMenuId;
+  hideMenuFormError();
   var name = $("menuName").value.trim();
   if (!name){ toast("메뉴 이름을 입력하세요."); focusFieldKo($("menuName")); return; }
+  /* 같은 가게 안에 같은 이름의 메뉴가 있으면 저장하지 않는다 (편집 중인 자기 자신은 제외) */
+  var dupName = (s.menus || []).some(function(m){ return m.id !== ui.editMenuId && String(m.name || "").trim() === name; });
+  if (dupName){ showMenuFormError("이미 있는 메뉴 이름이에요. 다른 이름을 써 주세요."); focusFieldKo($("menuName")); return; }
   var tt = selectedTempType();
   var price, priceIce = null, priceHot = null;
   if (tt === "both"){
@@ -8310,11 +8475,28 @@ $("menuSaveBtn").addEventListener("click", function(){
     if (bspecAdd) upsertMenuOverrideAdded(state, bspecAdd, newMenu);
     toast("메뉴 ‘" + name + "’를 추가했어요.");
   }
-  resetMenuForm(); touch();
+  var continueAdd = !wasEdit && !!($("menuContinueChk") && $("menuContinueChk").checked);
+  touch();
   publishState(); /* 메뉴 추가·편집도 디바운스를 기다리지 않고 바로 공유 — 열려 있는 주문 화면에 즉시 반영 */
+  refreshStoreCounts(); /* 메뉴 추가·편집 직후 가게 카드와 팝업 안 개수를 라이브 상태로 즉시 맞춘다 */
+  if (continueAdd){
+    /* ‘다음 메뉴 계속 추가’ — 팝업을 닫지 않고 이름·가격만 비운다.
+       카테고리·온도·사이즈 모드와 옵션 설정은 그대로 유지된다 */
+    ui.editMenuId = null;
+    $("menuFormTitle").textContent = "새 메뉴 추가"; $("menuSaveBtn").textContent = "메뉴 추가";
+    $("menuName").value = ""; $("menuPrice").value = "";
+    $("menuPriceIce").value = ""; $("menuPriceHot").value = "";
+    if ($("menuGcSizeL")) $("menuGcSizeL").value = "";
+    if ($("menuGcSizeJ")) $("menuGcSizeJ").value = "";
+    if ($("menuTousSizeR")) $("menuTousSizeR").value = "";
+    if ($("menuTousSizeL")) $("menuTousSizeL").value = "";
+    hideMenuFormError();
+    focusFieldKo($("menuName"));
+    return;
+  }
+  resetMenuForm();
   /* 저장하면 팝업을 닫고 목록으로 바로 돌아간다 */
   closeMenuModal();
-  refreshStoreCounts(); /* 메뉴 추가·편집 직후 가게 카드와 팝업 안 개수를 라이브 상태로 즉시 맞춘다 */
   refocusManageSearchAfterSave(); /* 검색 중이던 메뉴를 추가·편집했으면 편집 검색칸으로 바로 이어서 다음 메뉴를 찾게 한다 */
 });
 
