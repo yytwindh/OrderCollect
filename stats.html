@@ -6,44 +6,68 @@
 <title>Morder 통계 (개발자 전용)</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;background:#f3f6f4;color:#1c2b26}
-.wrap{max-width:960px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:24px;margin:8px 0 4px}
-h1 .brand{color:#2f6b5e}
-.sub{color:#6b7d76;font-size:13px;margin:0 0 20px}
-.card{background:#fff;border:1px solid #dde7e1;border-radius:16px;padding:18px;margin-bottom:16px}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;background:#f0f7f5;color:#132a26}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 56px}
+h1{font-size:26px;margin:8px 0 4px;letter-spacing:-.02em}
+h1 .brand{color:#0F766E}
+.sub{color:#647a74;font-size:13px;margin:0 0 20px;line-height:1.5}
+.card{background:#fff;border:1px solid #d7e8e2;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,118,110,.06)}
 .lock{max-width:420px;margin:64px auto 0;text-align:center}
-.lock input{width:100%;padding:13px 14px;border:1.5px solid #cfe0d7;border-radius:12px;font-size:16px;margin:12px 0 10px}
-.btn{background:#2f6b5e;color:#fff;border:0;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700;cursor:pointer}
-.btn:disabled{opacity:.5}
+.lock input{width:100%;padding:13px 14px;border:1.5px solid #bfe0d8;border-radius:12px;font-size:16px;margin:12px 0 10px}
+.btn{background:#0F766E;color:#fff;border:0;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700;cursor:pointer}
+.btn:hover{background:#0d655e}.btn:disabled{opacity:.5}
 .err{color:#c0392b;font-size:14px;min-height:20px;margin-top:8px}
 .hidden{display:none!important}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-.toolbar select{padding:10px 12px;border:1.5px solid #cfe0d7;border-radius:10px;font-size:15px;background:#fff}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;background:#fff;border:1px solid #d7e8e2;border-radius:14px;padding:12px 14px}
+.toolbar label{font-size:13px;font-weight:700;color:#0F766E}
+.toolbar select{padding:10px 12px;border:1.5px solid #bfe0d8;border-radius:10px;font-size:15px;background:#fff}
 .toolbar .btn{padding:10px 18px;font-size:14px}
-.status{color:#6b7d76;font-size:13px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
-.stat{background:#fff;border:1px solid #dde7e1;border-radius:16px;padding:16px}
-.stat .label{font-size:13px;color:#6b7d76;line-height:1.4}
-.stat .num{font-size:30px;font-weight:800;margin-top:6px;color:#1c2b26}
-.stat .num em{font-style:normal;font-size:14px;font-weight:600;color:#6b7d76}
+.toolbar .hint{font-size:12px;color:#647a74}
+.status{color:#647a74;font-size:13px;margin-left:auto}
+.section-head{display:flex;align-items:baseline;gap:10px;margin:26px 0 12px}
+.section-head h2{font-size:19px;margin:0;color:#0F766E}
+.section-head span{font-size:12px;color:#647a74}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:6px}
+.stat{background:#fff;border:1px solid #d7e8e2;border-top:4px solid #0F766E;border-radius:16px;padding:16px}
+.stat.alt{border-top-color:#14B8A6}.stat.alt2{border-top-color:#5EEAD4}
+.stat .label{font-size:13px;color:#647a74;line-height:1.45;min-height:38px}
+.stat .num{font-size:30px;font-weight:800;margin-top:6px;color:#132a26;line-height:1.1}
+.stat .num em{font-style:normal;font-size:14px;font-weight:600;color:#647a74}
+.stat .num.date{font-size:22px;padding-top:6px}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:9px 8px;border-bottom:1px solid #e6eee9;text-align:right;white-space:nowrap}
+th,td{padding:10px 8px;border-bottom:1px solid #e2efe9;text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
-thead th{color:#47635a;border-bottom:2px solid #cfe0d7}
+thead th{color:#0F766E;border-bottom:2px solid #99d5cc;background:#f0fdfa}
+tbody tr:hover td{background:#f7fcfb}
 tbody tr:last-child td{border-bottom:0}
-.empty{color:#6b7d76;text-align:center;padding:24px 0;font-size:14px}
-h2{font-size:17px;margin:4px 0 14px}
+.empty{color:#647a74;text-align:center;padding:24px 0;font-size:14px}
+h2.card-title{font-size:17px;margin:0 0 14px;color:#132a26}
 .bar-row{display:grid;grid-template-columns:86px 1fr 44px;gap:10px;align-items:center;margin:7px 0;font-size:13px}
-.bar-track{background:#e9f1ec;border-radius:999px;height:18px;overflow:hidden}
-.bar-fill{background:#2f6b5e;height:100%;border-radius:999px;min-width:0}
+.bar-track{background:#e6f2ee;border-radius:999px;height:18px;overflow:hidden}
+.bar-fill{background:#0F766E;height:100%;border-radius:999px}
 .bar-num{text-align:right;font-weight:700}
-.legend{font-size:12px;color:#6b7d76;margin-top:10px}
+.legend{font-size:12px;color:#647a74;margin-top:10px;line-height:1.6}
+.month-bars{display:flex;align-items:flex-end;gap:14px;min-height:190px;padding:18px 6px 0;border-bottom:2px solid #d7e8e2;overflow-x:auto}
+.month-col{flex:1;min-width:64px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:190px}
+.month-val{font-size:13px;font-weight:800;color:#0F766E;margin-bottom:6px}
+.month-bar{width:52px;max-width:80%;background:linear-gradient(180deg,#14B8A6,#0F766E);border-radius:10px 10px 0 0;min-height:4px}
+.month-label{font-size:12px;color:#647a74;margin-top:8px;white-space:nowrap}
+.growth-wrap{overflow-x:auto}
+.growth-svg{width:100%;min-width:560px;height:auto;display:block}
+.g-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin:10px 0 4px}
+.g-legend i{display:inline-block;width:22px;height:4px;border-radius:99px;vertical-align:middle;margin-right:6px}
+.filter-note{font-size:12.5px;color:#647a74;margin:0 2px 14px;line-height:1.5}
+.recent-item{padding:12px 2px;border-bottom:1px solid #e2efe9}
+.recent-item:last-child{border-bottom:0}
+.recent-top{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+.recent-when{font-weight:800;color:#0F766E;font-size:14px;white-space:nowrap}
+.recent-store{font-weight:700;font-size:15px}
+.recent-count{font-size:13px;color:#647a74;white-space:nowrap}
+.recent-members{font-size:13px;color:#3d554f;line-height:1.6;margin-top:4px;word-break:keep-all}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- 비밀번호 잠금 -->
   <div id="lockView" class="card lock">
     <h1><span class="brand">Morder</span> 통계</h1>
     <p class="sub">개발자 전용 페이지입니다. 비밀번호를 입력해 주세요.</p>
@@ -54,22 +78,61 @@ h2{font-size:17px;margin:4px 0 14px}
     </form>
   </div>
 
-  <!-- 통계 -->
   <div id="statsView" class="hidden">
     <h1><span class="brand">Morder</span> 통계</h1>
-    <p class="sub">익명 기기 ID 기준 집계입니다. 이름·전화번호 등 개인정보는 표시하지 않습니다.</p>
+    <p class="sub">익명 기기 ID 기준 집계입니다. 접속 통계는 이름 없이 집계하고, 선택 인원 이름은 아래 ‘최근 제출된 주문’ 목록에만 표시합니다.<br>누적·월별 통계는 전체 기간 기준이며, 일별 표만 아래 기간 선택의 영향을 받습니다.</p>
     <div class="toolbar">
+      <label for="periodSel">일별 기간</label>
       <select id="periodSel" aria-label="기간 선택">
         <option value="7">최근 7일</option>
         <option value="14">최근 14일</option>
         <option value="30" selected>최근 30일</option>
       </select>
       <button type="button" class="btn" id="refreshBtn">새로고침</button>
+      <span class="hint">기간은 일별 표·일별 막대에만 적용</span>
       <span class="status" id="statusText"></span>
     </div>
-    <div class="cards" id="totalCards"></div>
+    <p class="filter-note hidden" id="filterNote"></p>
+
+    <div class="section-head"><h2>📊 누적 통계</h2><span>전체 기간 · 기간 선택과 무관</span></div>
+    <div class="cards" id="cumulativeCards"></div>
+    <p class="legend" style="margin:4px 2px 0">주문 제출 수는 최종 주문 기준입니다 — <b>order_submitted</b> 문서가 사람당 채널당 1개라 문서 수가 곧 최종 주문을 낸 사람 수입니다. 취합 창 생성·주문 제출·Skip 집계에는 절반 초과 필터가 적용됩니다(제출 인원이 전체 인원의 절반을 초과한 채널만). 접속 기기 수(페이지뷰)는 필터 없이 집계합니다.</p>
+
+    <div class="section-head"><h2>📈 누적 성장 그래프</h2><span>날짜별 누적 건수</span></div>
     <div class="card">
-      <h2>일별 통계</h2>
+      <div class="g-legend">
+        <span><i style="background:#0F766E"></i>누적 주문 제출</span>
+        <span><i style="background:#D97706"></i>누적 취합 창 생성</span>
+      </div>
+      <div class="growth-wrap" id="growthWrap"></div>
+      <div class="empty hidden" id="growthEmpty">표시할 데이터가 없습니다.</div>
+    </div>
+
+    <div class="section-head"><h2>🕐 최근 제출된 주문</h2><span>절반 초과 필터 통과 채널만 · 방별 1줄 · 최신순 최대 20개</span></div>
+    <div class="card">
+      <div id="recentList"></div>
+      <div class="empty hidden" id="recentEmpty">조건을 통과한 주문 채널이 없습니다.</div>
+      <p class="legend">인원 이름은 제출 시점에 선택돼 있던 인원 목록(members)입니다. 이 목록은 개발자 전용인 이 페이지에서만 표시합니다.</p>
+    </div>
+
+    <div class="section-head"><h2>🗓️ 월별 통계</h2><span>전체 기간 · 오래된 달부터</span></div>
+    <div class="card">
+      <h2 class="card-title">월별 집계</h2>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>월</th><th>접속 기기 수</th><th>취합 창 생성</th><th>주문 제출</th><th>Skip</th></tr></thead>
+        <tbody id="monthlyBody"></tbody>
+      </table>
+      </div>
+      <div class="empty hidden" id="monthlyEmpty">기록된 데이터가 없습니다.</div>
+      <h2 class="card-title" style="margin-top:22px">월별 주문 제출 수</h2>
+      <div class="month-bars" id="monthBars"></div>
+      <div class="empty hidden" id="monthBarsEmpty">표시할 데이터가 없습니다.</div>
+    </div>
+
+    <div class="section-head"><h2>📅 일별 통계</h2><span id="dailyRangeLabel">선택한 기간만 표시</span></div>
+    <div class="card">
+      <h2 class="card-title">일별 통계</h2>
       <div style="overflow-x:auto">
       <table>
         <thead><tr>
@@ -82,7 +145,7 @@ h2{font-size:17px;margin:4px 0 14px}
       <div class="empty hidden" id="dailyEmpty">이 기간에 기록된 데이터가 없습니다.</div>
     </div>
     <div class="card">
-      <h2>날짜별 기기 수</h2>
+      <h2 class="card-title">날짜별 기기 수</h2>
       <div id="bars"></div>
       <p class="legend">막대 = 그날 접속한 익명 기기 수 (생성·취합 페이지 합집합, 기기당 1회)</p>
       <div class="empty hidden" id="barsEmpty">표시할 데이터가 없습니다.</div>
@@ -94,7 +157,6 @@ h2{font-size:17px;margin:4px 0 14px}
 <script>
 var EXPECTED_HASH = "284fbb3a84e7c3b3460402c4912ed5c8f3535a0627b623fda14f355ab454244e";
 var UNLOCK_KEY = "morder_stats_unlocked";
-
 firebase.initializeApp({
   apiKey: "AIzaSyBZ-oLvXPahBb2nf7eEfGWE_Yo5J3vdgZ8",
   authDomain: "ordercollect-54f46.firebaseapp.com",
@@ -104,144 +166,210 @@ firebase.initializeApp({
   appId: "1:763398349826:web:414d78a6b591eaaaf5331b"
 });
 var db = firebase.firestore();
+var ALL_EVENTS = []; // {ds, month, type, page, dev, room, store, members, dt}
+var ALL_LOADED = false;
+var PASSED_ROOMS = new Set(); // 절반 초과 필터를 통과한 방(room)
+var ROOM_GROUPS = {}; // room -> {count,total,latestDt,store,members}
+var EXCLUDED_ROOMS = 0; // 필터로 제외된 방 수 (order_submitted가 있는 방 기준)
 
-function kstDateStr(d) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(d);
-}
-function addDays(dateStr, n) {
-  var p = dateStr.split("-");
-  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
-  return d.toISOString().slice(0, 10);
-}
-function kstMidnightDate(dateStr) {
-  // KST(UTC+9) 자정 = 전날 15:00 UTC
-  var p = dateStr.split("-");
-  return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], -9, 0, 0));
-}
-function dateRange(days) {
-  var today = kstDateStr(new Date());
-  var out = [];
-  for (var i = days - 1; i >= 0; i--) out.push(addDays(today, -i));
-  return out; // 오름차순
-}
-
-async function sha256Hex(text) {
-  var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(function (b) {
-    return b.toString(16).padStart(2, "0");
-  }).join("");
-}
-
-function showStats() {
-  document.getElementById("lockView").classList.add("hidden");
-  document.getElementById("statsView").classList.remove("hidden");
-  loadStats();
-}
-document.getElementById("lockForm").addEventListener("submit", async function (e) {
-  e.preventDefault();
-  var v = document.getElementById("pwInput").value;
-  var err = document.getElementById("lockErr");
-  try {
-    var h = await sha256Hex(v);
-    if (h === EXPECTED_HASH) {
-      sessionStorage.setItem(UNLOCK_KEY, "1");
-      err.textContent = "";
-      showStats();
-    } else {
-      err.textContent = "비밀번호가 맞지 않습니다.";
-    }
-  } catch (ex) {
-    err.textContent = "확인 중 오류가 발생했습니다.";
-  }
-});
-if (sessionStorage.getItem(UNLOCK_KEY) === "1") showStats();
-
-async function loadStats() {
-  var days = parseInt(document.getElementById("periodSel").value, 10) || 30;
-  var dates = dateRange(days);
-  var start = kstMidnightDate(dates[0]);
-  var status = document.getElementById("statusText");
-  var btn = document.getElementById("refreshBtn");
-  status.textContent = "불러오는 중…";
-  btn.disabled = true;
-
-  var daily = {};
-  dates.forEach(function (ds) {
-    daily[ds] = {
-      createDevs: new Set(), orderDevs: new Set(), allDevs: new Set(),
-      created: 0, orders: 0, skips: 0
-    };
+function kstDateStr(d){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);}
+function addDays(dateStr,n){var p=dateStr.split("-");var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+n));return d.toISOString().slice(0,10);}
+function dateRange(days){var today=kstDateStr(new Date());var out=[];for(var i=days-1;i>=0;i--)out.push(addDays(today,-i));return out;}
+async function sha256Hex(text){var buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");}
+function fmt(n){return Number(n||0).toLocaleString("ko-KR");}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function fmtDateTime(dt){if(!dt)return "-";var p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(dt);var m={};p.forEach(function(x){m[x.type]=x.value;});return m.year+"-"+m.month+"-"+m.day+" "+m.hour+":"+m.minute;}
+/* 절반 초과 필터 — order_submitted를 방별로 묶어 제출수*2 > 총인원(members 길이)인 방만 통과.
+   members가 전혀 없는 방은 총인원을 알 수 없어 테스트로 단정하지 않고 통과로 둔다(구버전 기록 보존). */
+function computeRoomFilter(){
+  ROOM_GROUPS={};PASSED_ROOMS=new Set();EXCLUDED_ROOMS=0;
+  ALL_EVENTS.forEach(function(e){
+    if(e.type!=="order_submitted")return;
+    var key=e.room||"";
+    if(!ROOM_GROUPS[key])ROOM_GROUPS[key]={room:key,count:0,total:0,latestDt:null,store:"",members:[]};
+    var g=ROOM_GROUPS[key];g.count++;
+    if(e.members&&e.members.length>g.total)g.total=e.members.length;
+    if(!g.latestDt||(e.dt&&e.dt>g.latestDt)){g.latestDt=e.dt||g.latestDt;g.store=e.store||"";if(e.members&&e.members.length)g.members=e.members.slice();}
+    else if((!g.members||!g.members.length)&&e.members&&e.members.length)g.members=e.members.slice();
   });
-  var totCreateDevs = new Set(), totOrderDevs = new Set();
-  var totCreated = 0, totOrders = 0, totSkips = 0, totalDocs = 0;
-
-  try {
-    var snap = await db.collection("oc_analytics")
-      .where("t", ">=", firebase.firestore.Timestamp.fromDate(start))
-      .get();
-    snap.forEach(function (doc) {
-      var d = doc.data();
-      if (!d || !d.t || typeof d.t.toDate !== "function") return;
-      var ds = kstDateStr(d.t.toDate());
-      var row = daily[ds];
-      if (!row) return;
-      totalDocs++;
-      if (d.type === "pageview") {
-        if (d.dev) {
-          row.allDevs.add(d.dev);
-          if (d.page === "create") { row.createDevs.add(d.dev); totCreateDevs.add(d.dev); }
-          if (d.page === "order") { row.orderDevs.add(d.dev); totOrderDevs.add(d.dev); }
-        }
-      } else if (d.type === "channel_created") { row.created++; totCreated++; }
-      else if (d.type === "order_submitted") { row.orders++; totOrders++; }
-      else if (d.type === "skip") { row.skips++; totSkips++; }
-    });
-  } catch (ex) {
-    status.textContent = "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    btn.disabled = false;
-    return;
-  }
-
-  var cards = [
-    ["생성 페이지 기기 수", totCreateDevs.size, "대"],
-    ["취합 페이지 기기 수", totOrderDevs.size, "대"],
-    ["취합 창 생성 수", totCreated, "회"],
-    ["주문 제출 수", totOrders, "회"],
-    ["Skip 수", totSkips, "회"]
-  ];
-  document.getElementById("totalCards").innerHTML = cards.map(function (c) {
-    return '<div class="stat"><div class="label">' + c[0] +
-      '</div><div class="num">' + c[1].toLocaleString("ko-KR") +
-      ' <em>' + c[2] + "</em></div></div>";
-  }).join("");
-
-  document.getElementById("dailyBody").innerHTML = dates.map(function (ds) {
-    var r = daily[ds];
-    return "<tr><td>" + ds + "</td><td>" + r.createDevs.size + "</td><td>" +
-      r.orderDevs.size + "</td><td>" + r.created + "</td><td>" +
-      r.orders + "</td><td>" + r.skips + "</td></tr>";
-  }).join("");
-  document.getElementById("dailyEmpty").classList.toggle("hidden", totalDocs > 0);
-
-  var maxDevs = 0;
-  dates.forEach(function (ds) { maxDevs = Math.max(maxDevs, daily[ds].allDevs.size); });
-  document.getElementById("bars").innerHTML = dates.map(function (ds) {
-    var n = daily[ds].allDevs.size;
-    var pct = maxDevs > 0 ? Math.round(n / maxDevs * 100) : 0;
-    return '<div class="bar-row"><span>' + ds.slice(5) +
-      '</span><div class="bar-track"><div class="bar-fill" style="width:' +
-      pct + '%"></div></div><span class="bar-num">' + n + "</span></div>";
-  }).join("");
-  document.getElementById("barsEmpty").classList.toggle("hidden", totalDocs > 0);
-
-  status.textContent = dates[0] + " ~ " + dates[dates.length - 1] +
-    " · 이벤트 " + totalDocs.toLocaleString("ko-KR") + "건";
-  btn.disabled = false;
+  Object.keys(ROOM_GROUPS).forEach(function(key){
+    var g=ROOM_GROUPS[key];
+    if(g.total===0||g.count*2>g.total)PASSED_ROOMS.add(key);else EXCLUDED_ROOMS++;
+  });
 }
-document.getElementById("periodSel").addEventListener("change", loadStats);
-document.getElementById("refreshBtn").addEventListener("click", loadStats);
+/* 주문 관련 집계에 이 이벤트를 셀지 — 페이지뷰(방문)는 필터 없음, 나머지는 방이 통과해야 함 */
+function isCounted(e){
+  if(e.type==="pageview")return true;
+  return PASSED_ROOMS.has(e.room||"");
+}
+
+function showStats(){document.getElementById("lockView").classList.add("hidden");document.getElementById("statsView").classList.remove("hidden");loadStats();}
+document.getElementById("lockForm").addEventListener("submit",async function(e){e.preventDefault();var v=document.getElementById("pwInput").value;var err=document.getElementById("lockErr");try{var h=await sha256Hex(v);if(h===EXPECTED_HASH){sessionStorage.setItem(UNLOCK_KEY,"1");err.textContent="";showStats();}else{err.textContent="비밀번호가 맞지 않습니다.";}}catch(ex){err.textContent="확인 중 오류가 발생했습니다.";}});
+if(sessionStorage.getItem(UNLOCK_KEY)==="1")showStats();
+
+async function loadStats(){
+  var status=document.getElementById("statusText");var btn=document.getElementById("refreshBtn");
+  status.textContent="불러오는 중…";btn.disabled=true;
+  ALL_EVENTS=[];
+  try{
+    // 전체를 한 번에, t 내림차순 limit 5000 (복합 인덱스 없이 단일 필드 정렬)
+    var snap=await db.collection("oc_analytics").orderBy("t","desc").limit(5000).get();
+    snap.forEach(function(doc){
+      var d=doc.data();if(!d||!d.t||typeof d.t.toDate!=="function")return;
+      var ds=kstDateStr(d.t.toDate());
+      ALL_EVENTS.push({ds:ds,month:ds.slice(0,7),type:d.type||"",page:d.page||"",dev:d.dev||"",room:d.room||"",store:typeof d.store==="string"?d.store:"",members:Array.isArray(d.members)?d.members.slice():[],dt:d.t.toDate()});
+    });
+  }catch(ex){
+    status.textContent="데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";btn.disabled=false;return;
+  }
+  ALL_LOADED=true;
+  computeRoomFilter();
+  renderFilterNote();renderCumulative();renderMonthly();renderGrowth();renderDaily();renderRecent();
+  var datesAll=ALL_EVENTS.map(function(e){return e.ds;}).sort();
+  var rangeTxt=datesAll.length?(datesAll[0]+" ~ "+datesAll[datesAll.length-1]):"데이터 없음";
+  status.textContent="전체 "+rangeTxt+" · 이벤트 "+fmt(ALL_EVENTS.length)+"건 (최대 5,000건 조회)";
+  btn.disabled=false;
+}
+</script>
+<script>
+function renderFilterNote(){
+  var el=document.getElementById("filterNote");if(!el)return;
+  el.textContent="테스트성 채널 "+fmt(EXCLUDED_ROOMS)+"개 제외 — 제출 인원이 전체 인원의 절반을 초과한 채널만 주문 관련 집계에 반영합니다. (접속 기기 수는 필터 없이 집계)";
+  el.classList.remove("hidden");
+}
+function renderRecent(){
+  var groups=Object.keys(ROOM_GROUPS).map(function(k){return ROOM_GROUPS[k];}).filter(function(g){return PASSED_ROOMS.has(g.room);});
+  groups.sort(function(a,b){return (b.latestDt?b.latestDt.getTime():0)-(a.latestDt?a.latestDt.getTime():0);});
+  groups=groups.slice(0,20);
+  document.getElementById("recentEmpty").classList.toggle("hidden",groups.length>0);
+  document.getElementById("recentList").innerHTML=groups.map(function(g){
+    var total=g.total>0?g.total:g.count;
+    var names=(g.members&&g.members.length)?g.members.map(function(n){return esc(n);}).join(", "):"-";
+    return '<div class="recent-item"><div class="recent-top"><span class="recent-when">'+esc(fmtDateTime(g.latestDt))+'</span><span class="recent-store">'+esc(g.store||"(가게 미기록)")+'</span><span class="recent-count">제출 '+fmt(g.count)+" / 전체 "+fmt(total)+"명</span></div>"
+      +'<div class="recent-members">'+names+"</div></div>";
+  }).join("");
+}
+function renderCumulative(){
+  var devs=new Set(),created=0,orders=0,skips=0,oldest="";
+  ALL_EVENTS.forEach(function(e){
+    if(e.type==="pageview"&&e.dev)devs.add(e.dev);
+    else if(e.type==="channel_created"&&isCounted(e))created++;
+    else if(e.type==="order_submitted"&&isCounted(e))orders++;
+    else if(e.type==="skip"&&isCounted(e))skips++;
+    if(!oldest||e.ds<oldest)oldest=e.ds;
+  });
+  var cards=[
+    {label:"누적 접속 기기 수<br>(익명 기기 ID 중복 제거)",num:fmt(devs.size),unit:"대",cls:""},
+    {label:"누적 취합 창 생성 수",num:fmt(created),unit:"회",cls:"alt"},
+    {label:"누적 주문 제출 수<br>(최종 주문 기준)",num:fmt(orders),unit:"회",cls:""},
+    {label:"누적 Skip 수",num:fmt(skips),unit:"회",cls:"alt"},
+    {label:"데이터 시작일<br>(가장 오래된 기록)",num:oldest||"-",unit:"",cls:"alt2",isDate:true}
+  ];
+  document.getElementById("cumulativeCards").innerHTML=cards.map(function(c){
+    var numCls=c.isDate?"num date":"num";
+    var unit=c.unit?' <em>'+c.unit+"</em>":"";
+    return '<div class="stat '+c.cls+'"><div class="label">'+c.label+'</div><div class="'+numCls+'">'+esc(c.num)+unit+"</div></div>";
+  }).join("");
+}
+
+function renderMonthly(){
+  var map={};
+  ALL_EVENTS.forEach(function(e){
+    if(!map[e.month])map[e.month]={devs:new Set(),created:0,orders:0,skips:0};
+    var m=map[e.month];
+    if(e.type==="pageview"&&e.dev)m.devs.add(e.dev);
+    else if(e.type==="channel_created"&&isCounted(e))m.created++;
+    else if(e.type==="order_submitted"&&isCounted(e))m.orders++;
+    else if(e.type==="skip"&&isCounted(e))m.skips++;
+  });
+  var months=Object.keys(map).sort(); // 오래된 순
+  document.getElementById("monthlyBody").innerHTML=months.map(function(mo){
+    var m=map[mo];
+    return "<tr><td><b>"+esc(mo)+"</b></td><td>"+fmt(m.devs.size)+"</td><td>"+fmt(m.created)+"</td><td>"+fmt(m.orders)+"</td><td>"+fmt(m.skips)+"</td></tr>";
+  }).join("");
+  var has=months.length>0;
+  document.getElementById("monthlyEmpty").classList.toggle("hidden",has);
+  document.getElementById("monthBarsEmpty").classList.toggle("hidden",has);
+  var maxOrders=0;months.forEach(function(mo){maxOrders=Math.max(maxOrders,map[mo].orders);});
+  document.getElementById("monthBars").innerHTML=months.map(function(mo){
+    var v=map[mo].orders;
+    var h=maxOrders>0?Math.max(4,Math.round(v/maxOrders*130)):4;
+    return '<div class="month-col"><div class="month-val">'+fmt(v)+'건</div><div class="month-bar" style="height:'+h+'px" title="'+esc(mo)+' 주문 '+fmt(v)+'건"></div><div class="month-label">'+esc(mo)+"</div></div>";
+  }).join("");
+}
+
+function renderGrowth(){
+  var wrap=document.getElementById("growthWrap");
+  var perDay={};
+  ALL_EVENTS.forEach(function(e){
+    if(!perDay[e.ds])perDay[e.ds]={orders:0,created:0};
+    if(e.type==="order_submitted"&&isCounted(e))perDay[e.ds].orders++;
+    else if(e.type==="channel_created"&&isCounted(e))perDay[e.ds].created++;
+  });
+  var dates=Object.keys(perDay).sort();
+  document.getElementById("growthEmpty").classList.toggle("hidden",dates.length>0);
+  if(!dates.length){wrap.innerHTML="";return;}
+  var cumO=0,cumC=0,ptsO=[],ptsC=[],maxY=0;
+  dates.forEach(function(ds){cumO+=perDay[ds].orders;cumC+=perDay[ds].created;ptsO.push(cumO);ptsC.push(cumC);maxY=Math.max(maxY,cumO,cumC);});
+  if(maxY<5)maxY=5;
+  var W=900,H=280,PL=52,PR=18,PT=18,PB=38,PW=W-PL-PR,PH=H-PT-PB;
+  function X(i){return dates.length===1?PL+PW/2:PL+(i/(dates.length-1))*PW;}
+  function Y(v){return PT+PH-(v/maxY)*PH;}
+  function line(pts){return pts.map(function(v,i){return X(i).toFixed(1)+","+Y(v).toFixed(1);}).join(" ");}
+  var grid="";
+  for(var g=0;g<=4;g++){var gv=Math.round(maxY*g/4);var gy=Y(gv);grid+='<line x1="'+PL+'" y1="'+gy+'" x2="'+(W-PR)+'" y2="'+gy+'" stroke="#e2efe9" stroke-width="1"/><text x="'+(PL-8)+'" y="'+(gy+4)+'" font-size="11" fill="#647a74" text-anchor="end">'+gv+"</text>";}
+  var xlabels="";
+  var idxs=dates.length===1?[0]:[0,Math.floor((dates.length-1)/2),dates.length-1];
+  idxs.filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(i){xlabels+='<text x="'+X(i)+'" y="'+(H-12)+'" font-size="11" fill="#647a74" text-anchor="middle">'+esc(dates[i])+"</text>";});
+  var dotsO="",dotsC="";
+  if(dates.length<=60){ptsO.forEach(function(v,i){dotsO+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3.5" fill="#0F766E"/>';});ptsC.forEach(function(v,i){dotsC+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3.5" fill="#D97706"/>';});}
+  var lastO=ptsO[ptsO.length-1],lastC=ptsC[ptsC.length-1];
+  var svg='<svg class="growth-svg" viewBox="0 0 '+W+" "+H+'" role="img" aria-label="누적 성장 그래프">'
+    +grid
+    +'<line x1="'+PL+'" y1="'+(PT+PH)+'" x2="'+(W-PR)+'" y2="'+(PT+PH)+'" stroke="#bfe0d8" stroke-width="1.5"/>'
+    +'<polyline fill="none" stroke="#D97706" stroke-width="2.5" stroke-linejoin="round" points="'+line(ptsC)+'"/>'
+    +'<polyline fill="none" stroke="#0F766E" stroke-width="3" stroke-linejoin="round" points="'+line(ptsO)+'"/>'
+    +dotsC+dotsO
+    +'<text x="'+X(dates.length-1)+'" y="'+(Y(lastO)-10)+'" font-size="12" font-weight="700" fill="#0F766E" text-anchor="end">'+fmt(lastO)+"</text>"
+    +'<text x="'+X(dates.length-1)+'" y="'+(Y(lastC)+18)+'" font-size="12" font-weight="700" fill="#D97706" text-anchor="end">'+fmt(lastC)+"</text>"
+    +xlabels
+    +'<text x="'+PL+'" y="12" font-size="11" fill="#647a74">누적 건수</text>'
+    +"</svg>";
+  wrap.innerHTML=svg;
+}
+</script>
+<script>
+function renderDaily(){
+  if(!ALL_LOADED)return;
+  var days=parseInt(document.getElementById("periodSel").value,10)||30;
+  var dates=dateRange(days);
+  var inPeriod=new Set(dates);
+  var daily={};
+  dates.forEach(function(ds){daily[ds]={createDevs:new Set(),orderDevs:new Set(),allDevs:new Set(),created:0,orders:0,skips:0};});
+  var totalDocs=0;
+  ALL_EVENTS.forEach(function(e){
+    if(!inPeriod.has(e.ds))return;
+    var row=daily[e.ds];if(!row)return;totalDocs++;
+    if(e.type==="pageview"&&e.dev){row.allDevs.add(e.dev);if(e.page==="create")row.createDevs.add(e.dev);if(e.page==="order")row.orderDevs.add(e.dev);}
+    else if(e.type==="channel_created"&&isCounted(e))row.created++;
+    else if(e.type==="order_submitted"&&isCounted(e))row.orders++;
+    else if(e.type==="skip"&&isCounted(e))row.skips++;
+  });
+  document.getElementById("dailyRangeLabel").textContent=dates[0]+" ~ "+dates[dates.length-1]+" · 이 기간 이벤트 "+fmt(totalDocs)+"건";
+  document.getElementById("dailyBody").innerHTML=dates.map(function(ds){
+    var r=daily[ds];
+    return "<tr><td>"+ds+"</td><td>"+r.createDevs.size+"</td><td>"+r.orderDevs.size+"</td><td>"+r.created+"</td><td>"+r.orders+"</td><td>"+r.skips+"</td></tr>";
+  }).join("");
+  document.getElementById("dailyEmpty").classList.toggle("hidden",totalDocs>0);
+  var maxDevs=0;dates.forEach(function(ds){maxDevs=Math.max(maxDevs,daily[ds].allDevs.size);});
+  document.getElementById("bars").innerHTML=dates.map(function(ds){
+    var n=daily[ds].allDevs.size;var pct=maxDevs>0?Math.round(n/maxDevs*100):0;
+    return '<div class="bar-row"><span>'+ds.slice(5)+'</span><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><span class="bar-num">'+n+"</span></div>";
+  }).join("");
+  document.getElementById("barsEmpty").classList.toggle("hidden",totalDocs>0);
+}
+document.getElementById("periodSel").addEventListener("change",renderDaily);
+document.getElementById("refreshBtn").addEventListener("click",loadStats);
 </script>
 </body>
 </html>
