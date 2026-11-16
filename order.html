@@ -12,13 +12,28 @@
 <meta name="twitter:title" content="Morder 취합하기">
 <meta name="twitter:description" content="주문 링크 하나면 끝. 이름 고르고 메뉴 담으면 합계까지 알아서 모여.">
 <meta name="twitter:image" content="https://yytwindh.github.io/OrderCollect/og-order.png">
-<style>html,body{margin:0;padding:0;height:100%;overflow:hidden}iframe{border:0;width:100vw;height:100vh;display:block}</style>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#fff;font-family:"Fredoka",sans-serif;}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:pointer;}
+  .m{font-size:120px;font-weight:700;color:#0F766E;line-height:1;}
+  .o{font-size:36px;font-weight:500;color:#0F766E;letter-spacing:14px;margin-top:10px;}
+  h1{font-size:26px;font-weight:600;color:#1F2937;margin:28px 0 8px;}
+  p{font-size:16px;color:#6B7280;margin:0 0 28px;}
+  .btn{display:inline-block;background:#0F766E;color:#fff;font-size:19px;font-weight:600;padding:15px 34px;border-radius:999px;text-decoration:none;}
+</style>
 </head>
 <body>
-<iframe id="app" title="Morder 취합하기" allow="clipboard-write"></iframe>
+<div class="m">M</div>
+<div class="o">order</div>
+<h1>주문 취합하기</h1>
+<p>이름 고르고 메뉴 담으면 합계까지 알아서 모여요.</p>
+<a class="btn" id="go" href="#">주문 화면으로 이동 →</a>
 <script>
-  var f = document.getElementById('app');
-  f.src = 'index.html' + location.search + location.hash;
+  function target(){ return 'index.html' + location.search + location.hash; }
+  var go = document.getElementById('go');
+  go.href = target();
+  document.body.addEventListener('click', function(){ location.href = target(); });
 </script>
 </body>
 </html>
