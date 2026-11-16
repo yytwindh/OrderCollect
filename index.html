@@ -1001,6 +1001,33 @@
             </div>
           </div>
         </div>
+        <!-- 폴바셋 사이즈 (STANDARD · GRAND · VENTI) — 사이즈구분없음 / STANDARD만 / GRAND만 / VENTI만 / 전체 다섯 가지.
+             하나만 있는 메뉴는 입력한 가격이 그 사이즈 가격이 되어 사이즈 선택 없이 고정돼 담기고,
+             ‘전체’는 사이즈마다 가격을 따로 입력해 주문 팝업에서 고른다 -->
+        <div class="mt hidden" id="menuPaulSizeWrap">
+          <span class="flabel">사이즈 (폴바셋 — STANDARD · GRAND · VENTI)</span>
+          <div class="radiochips" role="radiogroup" aria-label="폴바셋 사이즈">
+            <label><input type="radio" name="paulSizeMode" value="none" checked /> 사이즈구분없음</label>
+            <label><input type="radio" name="paulSizeMode" value="standard" /> STANDARD만</label>
+            <label><input type="radio" name="paulSizeMode" value="grand" /> GRAND만</label>
+            <label><input type="radio" name="paulSizeMode" value="venti" /> VENTI만</label>
+            <label><input type="radio" name="paulSizeMode" value="all" /> 전체</label>
+          </div>
+          <div class="formgrid two hidden" id="menuPaulSizeFields" style="margin-top:8px">
+            <div>
+              <label class="flabel" for="menuPaulSizeS">STANDARD 가격 (원)</label>
+              <input class="field" id="menuPaulSizeS" type="number" inputmode="numeric" min="0" step="100" placeholder="5300" />
+            </div>
+            <div>
+              <label class="flabel" for="menuPaulSizeG">GRAND 가격 (원)</label>
+              <input class="field" id="menuPaulSizeG" type="number" inputmode="numeric" min="0" step="100" placeholder="5800" />
+            </div>
+            <div>
+              <label class="flabel" for="menuPaulSizeV">VENTI 가격 (원)</label>
+              <input class="field" id="menuPaulSizeV" type="number" inputmode="numeric" min="0" step="100" placeholder="6300" />
+            </div>
+          </div>
+        </div>
         <!-- 스타벅스 사이즈·원두 — ‘전체’는 입력한 가격을 Tall 기준으로 보고 나머지 사이즈를
              정해진 차액으로 자동 계산하고, Short만·Tall만처럼 하나만 고르면 입력한 가격이
              그 사이즈 가격이 되어 사이즈 선택 없이 그 사이즈로 고정돼 담긴다 -->
@@ -8002,7 +8029,7 @@ $("menuCatCustom").addEventListener("change", function(){ applyOptDefaults(); ap
 /* ---------- 가게별 메뉴 입력란 (사내 입점 매장 전용) ----------
    사내 가게는 가게마다 메뉴 조건이 달라 입력란도 가게에 맞게 바꾼다:
    공차 = 당도·얼음양·토핑 옵션 + L/J 사이즈 가격, 스타벅스 = Tall 기준 사이즈 자동 계산 + 원두,
-   뚜레쥬르 = REGULAR/LARGE 사이즈 가격, 메가커피·폴바셋 = 단일 가격이라 안내만 보여준다.
+   뚜레쥬르 = REGULAR/LARGE 사이즈 가격, 폴바셋 = STANDARD/GRAND/VENTI 사이즈 가격, 메가커피 = 단일 가격이라 안내만 보여준다.
    사외·팝업스토어와 직접 만든 가게는 지금처럼 이름·가격·구분·온도만으로 단순하게 둔다 */
 function manageStore(){
   return ui.manageStoreId ? storeById(ui.manageStoreId) : null;
@@ -8017,19 +8044,19 @@ function currentMenuBasePrice(){
 }
 function syncMenuStoreSections(){
   var s = manageStore();
-  var gc = isGongchaStore(s), sb = isStarbucksStore(s), tous = isTousStore(s);
+  var gc = isGongchaStore(s), sb = isStarbucksStore(s), tous = isTousStore(s), paul = isPaulStore(s);
   var gw = $("menuGcSizeWrap"); if (gw) gw.classList.toggle("hidden", !gc);
   var tw = $("menuTousSizeWrap"); if (tw) tw.classList.toggle("hidden", !tous);
+  var pw = $("menuPaulSizeWrap"); if (pw) pw.classList.toggle("hidden", !paul);
   var sw = $("menuSbWrap"); if (sw) sw.classList.toggle("hidden", !sb);
   var hw = $("menuSimpleHintWrap"), ht = $("menuSimpleHint");
   if (hw && ht){
     var simple = "";
     if (isMegaStore(s)) simple = "메가커피는 사이즈·옵션 없이 가격 하나로 등록해요. 온도 구분만 메뉴에 맞게 골라 주세요.";
-    else if (isPaulStore(s)) simple = "폴바셋은 사이즈·옵션 없이 가격 하나로 등록해요. 벤티처럼 크기가 다른 메뉴는 별도 메뉴로 등록해 주세요.";
     hw.classList.toggle("hidden", !simple);
     if (simple) ht.textContent = simple;
   }
-  syncGcSizeFields(); syncTousSizeFields(); updateSbPreview();
+  syncGcSizeFields(); syncTousSizeFields(); syncPaulSizeFields(); updateSbPreview();
 }
 /* 사이즈 모드 라디오 값 읽기·설정 — 공차 none/L/J/LJ, 뚜레쥬르 none/R/L/RL,
    스타벅스 none/short/tall/grande/venti/trenta/all */
@@ -8042,7 +8069,9 @@ function setSizeMode(name, v){
 }
 function gcSizeMode(){ return sizeModeOf("gcSizeMode"); }
 function tousSizeMode(){ return sizeModeOf("tousSizeMode"); }
+function paulSizeMode(){ return sizeModeOf("paulSizeMode"); }
 function sbSizeMode(){ return sizeModeOf("sbSizeMode"); }
+var PAUL_SINGLE_LABELS = { standard: "STANDARD", grand: "GRAND", venti: "VENTI" };
 function setSbSizeRadiosDisabled(dis){
   Array.prototype.forEach.call(document.querySelectorAll('input[name="sbSizeMode"]'), function(r){ r.disabled = !!dis; });
 }
@@ -8061,6 +8090,11 @@ function syncTousSizeFields(){
   var rw = $("menuTousSizeRWrap"), lw = $("menuTousSizeLWrap");
   if (rw) rw.classList.toggle("hidden", !(mode === "R" || mode === "RL"));
   if (lw) lw.classList.toggle("hidden", !(mode === "L" || mode === "RL"));
+}
+/* 폴바셋 가격 칸은 ‘전체’일 때만 보인다 — 하나만 고른 모드는 입력한 기본 가격이 그 사이즈 가격이다 */
+function syncPaulSizeFields(){
+  var f = $("menuPaulSizeFields");
+  if (f) f.classList.toggle("hidden", paulSizeMode() !== "all");
 }
 /* 스타벅스 기본값 — 음료(온도 구분 있음)면 사이즈 ‘전체’, ‘에스프레소 / 커피’거나
    원두를 고르는 음료로 이름이 못박힌 메뉴면 원두도 켜짐. 사이즈 구분이 없는
@@ -8129,6 +8163,18 @@ function fillMenuStoreFields(menu){
     $("menuTousSizeL").value = sizeOf("LARGE");
     syncTousSizeFields();
   }
+  if (isPaulStore(manageStore())){
+    var paulMode = "none";
+    if (szs.length === 1){
+      var oneLbl = String(szs[0].label || "").toLowerCase();
+      paulMode = PAUL_SINGLE_LABELS[oneLbl] ? oneLbl : "none";
+    } else if (szs.length > 1) paulMode = "all";
+    setSizeMode("paulSizeMode", paulMode);
+    $("menuPaulSizeS").value = sizeOf("STANDARD");
+    $("menuPaulSizeG").value = sizeOf("GRAND");
+    $("menuPaulSizeV").value = sizeOf("VENTI");
+    syncPaulSizeFields();
+  }
   if (isStarbucksStore(manageStore())){
     var raw = rawSizes(menu);
     var sbMode = "none";
@@ -8152,6 +8198,10 @@ function resetMenuStoreFields(){
   setSizeMode("tousSizeMode", "none");
   if ($("menuTousSizeR")) $("menuTousSizeR").value = "";
   if ($("menuTousSizeL")) $("menuTousSizeL").value = "";
+  setSizeMode("paulSizeMode", "none");
+  if ($("menuPaulSizeS")) $("menuPaulSizeS").value = "";
+  if ($("menuPaulSizeG")) $("menuPaulSizeG").value = "";
+  if ($("menuPaulSizeV")) $("menuPaulSizeV").value = "";
   syncMenuStoreSections();
   applySbDefaults();
 }
@@ -8174,6 +8224,12 @@ Array.prototype.forEach.call(document.querySelectorAll('input[name="tousSizeMode
     syncTousSizeFields();
     if (r.value === "R" || r.value === "RL") prefillFirstSize("menuTousSizeR");
     if (r.value === "L") prefillFirstSize("menuTousSizeL");
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll('input[name="paulSizeMode"]'), function(r){
+  r.addEventListener("change", function(){
+    syncPaulSizeFields();
+    if (r.value === "all") prefillFirstSize("menuPaulSizeS");
   });
 });
 Array.prototype.forEach.call(document.querySelectorAll('input[name="sbSizeMode"]'), function(r){
@@ -8236,6 +8292,21 @@ function menuStoreFieldsValue(name, tt, basePrice){
     if (isNaN(tr) || tr < 0) return { error: "REGULAR 가격을 숫자로 입력하세요.", focus: "menuTousSizeR" };
     if (isNaN(tl) || tl < 0) return { error: "LARGE 가격을 숫자로 입력하세요.", focus: "menuTousSizeL" };
     return { sizes: [{ label: "REGULAR", price: tr }, { label: "LARGE", price: tl }], beans: null, baseOverride: tr };
+  }
+  if (isPaulStore(s)){
+    var pm = paulSizeMode();
+    if (pm === "none") return { sizes: null, beans: null };
+    if (PAUL_SINGLE_LABELS[pm]){
+      /* 단일 사이즈 — 입력한 가격(기준 가격)이 곧 그 사이즈 가격이다 */
+      if (basePrice == null || isNaN(basePrice) || basePrice < 0)
+        return { error: PAUL_SINGLE_LABELS[pm] + " 가격을 숫자로 입력하세요.", focus: "menuPrice" };
+      return { sizes: [{ label: PAUL_SINGLE_LABELS[pm], price: basePrice }], beans: null };
+    }
+    var ps = parseInt($("menuPaulSizeS").value, 10), pg = parseInt($("menuPaulSizeG").value, 10), pv = parseInt($("menuPaulSizeV").value, 10);
+    if (isNaN(ps) || ps < 0) return { error: "STANDARD 가격을 숫자로 입력하세요.", focus: "menuPaulSizeS" };
+    if (isNaN(pg) || pg < 0) return { error: "GRAND 가격을 숫자로 입력하세요.", focus: "menuPaulSizeG" };
+    if (isNaN(pv) || pv < 0) return { error: "VENTI 가격을 숫자로 입력하세요.", focus: "menuPaulSizeV" };
+    return { sizes: [{ label: "STANDARD", price: ps }, { label: "GRAND", price: pg }, { label: "VENTI", price: pv }], beans: null, baseOverride: ps };
   }
   if (isStarbucksStore(s)){
     var sizes = null, beans = null;
@@ -8490,6 +8561,9 @@ $("menuSaveBtn").addEventListener("click", function(){
     if ($("menuGcSizeJ")) $("menuGcSizeJ").value = "";
     if ($("menuTousSizeR")) $("menuTousSizeR").value = "";
     if ($("menuTousSizeL")) $("menuTousSizeL").value = "";
+    if ($("menuPaulSizeS")) $("menuPaulSizeS").value = "";
+    if ($("menuPaulSizeG")) $("menuPaulSizeG").value = "";
+    if ($("menuPaulSizeV")) $("menuPaulSizeV").value = "";
     hideMenuFormError();
     focusFieldKo($("menuName"));
     return;
