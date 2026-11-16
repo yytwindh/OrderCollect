@@ -920,51 +920,69 @@
             <label><input type="checkbox" id="optTopChk" /> 토핑 추가 가능</label>
           </div>
         </div>
-        <!-- 공차 사이즈 (L · J) — 사이즈가 있는 메뉴만 켠다. 주문 팝업에서 고른 사이즈 가격이 그대로 적용된다 -->
+        <!-- 공차 사이즈 (L · J) — 없음 / L만 / J만 / L+J 네 가지. 하나만 있는 메뉴는
+             사이즈 선택 없이 그 사이즈로 고정돼 담기고, L+J만 주문 팝업에서 고른다 -->
         <div class="mt hidden" id="menuGcSizeWrap">
           <span class="flabel">사이즈 (공차 — L · J)</span>
-          <div class="radiochips">
-            <label><input type="checkbox" id="menuGcSizeUse" /> 사이즈 선택 사용</label>
+          <div class="radiochips" role="radiogroup" aria-label="공차 사이즈">
+            <label><input type="radio" name="gcSizeMode" value="none" checked /> 없음</label>
+            <label><input type="radio" name="gcSizeMode" value="L" /> L만</label>
+            <label><input type="radio" name="gcSizeMode" value="J" /> J만</label>
+            <label><input type="radio" name="gcSizeMode" value="LJ" /> L+J</label>
           </div>
           <div class="formgrid two hidden" id="menuGcSizeFields" style="margin-top:8px">
-            <div>
+            <div id="menuGcSizeLWrap">
               <label class="flabel" for="menuGcSizeL">L 가격 (원)</label>
               <input class="field" id="menuGcSizeL" type="number" inputmode="numeric" min="0" step="10" placeholder="3680" />
             </div>
-            <div>
+            <div id="menuGcSizeJWrap">
               <label class="flabel" for="menuGcSizeJ">J 가격 (원)</label>
               <input class="field" id="menuGcSizeJ" type="number" inputmode="numeric" min="0" step="10" placeholder="4560" />
             </div>
           </div>
-          <p class="hint">사이즈를 켜면 주문할 때 L·J를 골라 그 가격으로 담겨요.<br />L 가격이 메뉴 기본 가격이 됩니다. 사이즈 없는 메뉴(스무디·1L 등)는 끈 채로 두세요.</p>
+          <p class="hint">없음은 가격 하나로 등록돼요. L만·J만은 가격 하나만 넣으면 사이즈 선택 없이 그 사이즈로 고정돼 담겨요 (예: 납작복숭아는 J만).<br />L+J는 L·J 가격을 각각 넣고 주문할 때 골라요. 사이즈 가격이 메뉴 기본 가격이 됩니다.</p>
         </div>
-        <!-- 뚜레쥬르 사이즈 (REGULAR · LARGE) — 둘 다 파는 메뉴만 켠다 -->
+        <!-- 뚜레쥬르 사이즈 (REGULAR · LARGE) — 없음 / REGULAR만 / LARGE만 / REGULAR+LARGE 네 가지.
+             하나만 있는 메뉴는 사이즈 선택 팝업 없이 그 사이즈로 고정돼 담긴다 -->
         <div class="mt hidden" id="menuTousSizeWrap">
           <span class="flabel">사이즈 (뚜레쥬르 — REGULAR · LARGE)</span>
-          <div class="radiochips">
-            <label><input type="checkbox" id="menuTousSizeUse" /> 사이즈 선택 사용</label>
+          <div class="radiochips" role="radiogroup" aria-label="뚜레쥬르 사이즈">
+            <label><input type="radio" name="tousSizeMode" value="none" checked /> 없음</label>
+            <label><input type="radio" name="tousSizeMode" value="R" /> REGULAR만</label>
+            <label><input type="radio" name="tousSizeMode" value="L" /> LARGE만</label>
+            <label><input type="radio" name="tousSizeMode" value="RL" /> REGULAR+LARGE</label>
           </div>
           <div class="formgrid two hidden" id="menuTousSizeFields" style="margin-top:8px">
-            <div>
+            <div id="menuTousSizeRWrap">
               <label class="flabel" for="menuTousSizeR">REGULAR 가격 (원)</label>
               <input class="field" id="menuTousSizeR" type="number" inputmode="numeric" min="0" step="100" placeholder="2900" />
             </div>
-            <div>
+            <div id="menuTousSizeLWrap">
               <label class="flabel" for="menuTousSizeL">LARGE 가격 (원)</label>
               <input class="field" id="menuTousSizeL" type="number" inputmode="numeric" min="0" step="100" placeholder="3800" />
             </div>
           </div>
-          <p class="hint">사이즈를 켜면 주문할 때 REGULAR·LARGE를 골라 그 가격으로 담겨요.<br />REGULAR 가격이 메뉴 기본 가격이 됩니다. 사이즈가 하나뿐인 메뉴는 끈 채로 두세요.</p>
+          <p class="hint">없음은 가격 하나로 등록돼요. REGULAR만·LARGE만은 가격 하나만 넣으면 사이즈 선택 없이 그 사이즈로 고정돼 담겨요 (예: 자몽에이드·레몬에이드는 LARGE만).<br />REGULAR+LARGE는 가격을 각각 넣고 주문할 때 골라요. 사이즈 가격이 메뉴 기본 가격이 됩니다.</p>
         </div>
-        <!-- 스타벅스 사이즈·원두 — 입력한 가격은 Tall 기준이고, 나머지 사이즈는 정해진 차액으로 자동 계산된다 -->
+        <!-- 스타벅스 사이즈·원두 — ‘전체’는 입력한 가격을 Tall 기준으로 보고 나머지 사이즈를
+             정해진 차액으로 자동 계산하고, Short만·Tall만처럼 하나만 고르면 입력한 가격이
+             그 사이즈 가격이 되어 사이즈 선택 없이 그 사이즈로 고정돼 담긴다 -->
         <div class="mt hidden" id="menuSbWrap">
           <span class="flabel">사이즈 · 원두 (스타벅스)</span>
-          <div class="radiochips">
-            <label><input type="checkbox" id="menuSbSizeUse" /> 사이즈 선택 사용</label>
+          <div class="radiochips" role="radiogroup" aria-label="스타벅스 사이즈">
+            <label><input type="radio" name="sbSizeMode" value="none" checked /> 없음</label>
+            <label><input type="radio" name="sbSizeMode" value="short" /> Short만</label>
+            <label><input type="radio" name="sbSizeMode" value="tall" /> Tall만</label>
+            <label><input type="radio" name="sbSizeMode" value="grande" /> Grande만</label>
+            <label><input type="radio" name="sbSizeMode" value="venti" /> Venti만</label>
+            <label><input type="radio" name="sbSizeMode" value="trenta" /> Trenta만</label>
+            <label><input type="radio" name="sbSizeMode" value="all" id="menuSbModeAll" /> 전체</label>
+          </div>
+          <div class="radiochips" style="margin-top:8px">
             <label><input type="checkbox" id="menuSbBeanUse" /> 원두 선택 사용</label>
           </div>
           <div class="sizepreview" id="menuSbPreview" aria-live="polite"></div>
-          <p class="hint">입력한 가격은 Tall 가격이에요. Short는 Tall −800원(HOT 전용), Grande +600원, Venti +1,400원, Trenta +2,200원(아이스 전용·해당 음료만)으로 자동 계산돼요.<br />원두는 시그니처·블론드 추가금 없음, 디카페인·1/2 디카페인은 +300원이에요. 음식·병음료는 둘 다 끄세요.</p>
+          <p class="hint">‘전체’는 입력한 가격을 Tall 가격으로 보고 Short −800원(HOT 전용), Grande +600원, Venti +1,400원, Trenta +2,200원(아이스 전용·해당 음료만)으로 자동 계산돼요.<br />Short만·Tall만처럼 하나만 고르면 입력한 가격이 그 사이즈 가격이 되고, 사이즈 선택 없이 그 사이즈로 고정돼 담겨요.<br />원두는 시그니처·블론드 추가금 없음, 디카페인·1/2 디카페인은 +300원이에요. 음식·병음료는 사이즈 ‘없음’으로 두고 원두도 끄세요.</p>
         </div>
         <!-- 메가커피·폴바셋 안내 — 이 두 가게는 사이즈·옵션 없이 단일 가격이라 추가 입력란이 없다 -->
         <div class="mt hidden" id="menuSimpleHintWrap">
@@ -1709,9 +1727,9 @@ function limitsText(lim){
 function hasLimits(lim){ return !!limitsText(lim); }
 /* ---------- 기본 가게 (앱 내장 5곳 — 모두 삼성전자DSR점 가격) ----------
    병합 규칙: 공유 데이터(state.stores)에 같은 이름의 가게가 이미 있으면 그쪽을 쓰고(중복 추가 안 함),
-   없을 때만 아래 기본 가게를 채워 넣는다. 기본 가게도 일반 가게와 똑같이 편집·삭제할 수 있고,
-   삭제하면 그 id가 state.removedBuiltins에 기록되어 공유 상태와 함께 모든 기기에 퍼지므로
-   다음 접속 때 다시 살아나지 않는다. 이름이 바뀐 기본 가게는 id로 알아본다.
+   없을 때만 아래 기본 가게를 채워 넣는다. 기본 가게(사내 입점 매장 5곳)는 편집은 할 수 있지만
+   가게 자체 삭제는 막혀 있다(삭제 버튼을 보여주지 않고, 핸들러에서도 안내 후 중단한다).
+   메뉴 하나씩 지우는 건 그대로 가능하다. 이름이 바뀐 기본 가게는 id로 알아본다.
    스펙 버전(BUILTIN_VERSION)이 오르면 이미 들어간 기본 가게는 refreshBuiltinStore로 한 번 새로고침된다.
    메뉴 표기: [이름, 가격] — ICE·HOT 가격이 다르면 [이름, ICE가격, HOT가격],
    카테고리 기본값과 온도 방식이 다르면 [이름, 가격, "ice"]처럼 문자열로 덮어쓴다 */
@@ -2786,22 +2804,34 @@ function priceFor(menu, temp){
   if (menu.tempType === "hot" && menu.priceHot != null && !isNaN(Number(menu.priceHot))) return Number(menu.priceHot);
   return Number(menu.price) || 0;
 }
-/* 사이즈가 둘 이상인 메뉴(예: 뚜레쥬르 REGULAR·LARGE)인지 — 메뉴 데이터의 sizes로 판단한다.
-   사이즈가 하나뿐이거나 없으면 null이라 팝업 없이 기존 방식으로 바로 담긴다 */
-function menuSizes(menu){
+/* 메뉴에 저장된 사이즈 전체(하나뿐인 경우 포함) — 가격 조회·표시는 이걸로 한다.
+   사이즈가 하나뿐인 메뉴는 ‘고정 사이즈’로 보고, 선택 팝업 없이 그 사이즈로 담긴다 */
+function rawSizes(menu){
   if (!menu || !Array.isArray(menu.sizes)) return null;
   var out = menu.sizes.filter(function(s){ return s && s.label && !isNaN(Number(s.price)); });
-  return out.length > 1 ? out : null;
+  return out.length ? out : null;
+}
+/* 사이즈가 둘 이상이라 주문할 때 골라야 하는 메뉴인지 — 메뉴 데이터의 sizes로 판단한다.
+   사이즈가 하나뿐이면 null이라 팝업 없이 고정 사이즈로 바로 담긴다 */
+function menuSizes(menu){
+  var out = rawSizes(menu);
+  return out && out.length > 1 ? out : null;
+}
+/* 사이즈가 하나뿐인 메뉴의 고정 사이즈 — 없으면(없거나 둘 이상이면) null */
+function fixedSize(menu){
+  var out = rawSizes(menu);
+  return out && out.length === 1 ? out[0] : null;
 }
 function sizePrice(menu, label){
-  var szs = menuSizes(menu); if (!szs) return null;
+  var szs = rawSizes(menu); if (!szs) return null;
   for (var i = 0; i < szs.length; i++) if (szs[i].label === label) return Number(szs[i].price);
   return null;
 }
 /* 지금 고른 온도에서 실제로 주문할 수 있는 사이즈만 추린다 — Short는 HOT 전용,
-   Trenta는 ICE 전용이라, 온도에 안 맞는 사이즈는 팝업에 아예 보여주지 않는다 */
+   Trenta는 ICE 전용이라, 온도에 안 맞는 사이즈는 팝업에 아예 보여주지 않는다.
+   하나만 남으면 그 사이즈가 고정 사이즈가 된다 */
 function sizesForTemp(menu, temp){
-  var szs = menuSizes(menu); if (!szs) return null;
+  var szs = rawSizes(menu); if (!szs) return null;
   var out = szs.filter(function(s){
     return !s.only || (s.only === "hot" && temp === "HOT") || (s.only === "ice" && temp === "ICE");
   });
@@ -2820,7 +2850,7 @@ function beanAdd(menu, label){
   return 0;
 }
 function priceText(menu){
-  var szs = menuSizes(menu);
+  var szs = rawSizes(menu);
   if (szs) return szs.map(function(s){ return s.label + " " + won(Number(s.price)); }).join(" · ");
   if (menu && menu.tempType === "both"){
     var pi = priceFor(menu, "ICE"), ph = priceFor(menu, "HOT");
@@ -5409,7 +5439,7 @@ function renderMenuArea(){
         : '<button type="button" class="addbtn" data-add="' + esc(m.id) + '" aria-label="' + esc(m.name) + ' 담기"' + dis + '>＋</button>');
     return '<div class="mrow' + (totalQty>0 ? " in-cart" : "") + (blocked ? " blocked" : "") + '">'
       + '<div class="minfo"><div class="mname">' + esc(m.name) + '</div><div class="mprice">' + esc(priceText(m)) + '</div>'
-      + (totalQty > 0 && (m.tempType === "both" || isGc || menuSizes(m) || menuBeans(m)) ? '<div class="mnote">장바구니: ' + esc(cartBreakdown(m.id)) + "</div>" : "")
+      + (totalQty > 0 && (m.tempType === "both" || isGc || menuSizes(m) || fixedSize(m) || menuBeans(m)) ? '<div class="mnote">장바구니: ' + esc(cartBreakdown(m.id)) + "</div>" : "")
       + note + "</div>"
       + tempCtl
       + '<span class="addslot">' + addCtl + "</span>"
@@ -5543,8 +5573,10 @@ function changeQty(menuId, delta){
   var rs = roundStore(); if (!rs) return;
   var menu = null; rs.menus.forEach(function(m){ if (m.id===menuId) menu = m; });
   if (!menu) return;
+  /* 사이즈가 하나뿐인 메뉴는 팝업 없이 이 경로로 담긴다 — 고정 사이즈와 그 가격이 정답이다 */
+  var fx = fixedSize(menu);
   if (delta > 0){
-    var v = limitViolation(menu, delta);
+    var v = limitViolation(menu, delta, fx ? Number(fx.price) : null);
     if (v){ toast(v); return; }
   }
   var key = cartKeyFor(menu);
@@ -5552,10 +5584,12 @@ function changeQty(menuId, delta){
   if (!c){
     if (delta < 0) return;
     var t = tempLabel(menu, ui.tempSel[menuId]);
-    c = ui.cart[key] = { menuId:menuId, name:menu.name, price: priceFor(menu, t), tempType:menu.tempType, cat:menuCat(menu), temp: t, qty:0 };
+    c = ui.cart[key] = { menuId:menuId, name:menu.name, price: fx ? Number(fx.price) : priceFor(menu, t), tempType:menu.tempType, cat:menuCat(menu), temp: t, qty:0 };
+    if (fx) c.size = fx.label;
   }
   c.cat = menuCat(menu);
-  c.price = priceFor(menu, c.temp);
+  if (fx){ c.size = fx.label; c.price = Number(fx.price); }
+  else c.price = priceFor(menu, c.temp);
   c.qty += delta;
   if (c.qty <= 0) delete ui.cart[key];
   renderMenuArea(); renderCart();
@@ -5820,13 +5854,16 @@ function gcToppingsSelected(){
   return out;
 }
 function gcSelectedSize(){
-  if (!gcSel || !gcSel.sizes) return "";
+  if (!gcSel) return "";
+  /* 사이즈가 하나뿐이면 선택 없이 그 사이즈로 고정된다 */
+  if (gcSel.fixedSz) return gcSel.fixedSz.label;
+  if (!gcSel.sizes) return "";
   return gcChecked("gcSize") || gcSel.sizes[0].label;
 }
 function gcUnitPrice(){
   if (!gcSel) return 0;
   var p = null;
-  if (gcSel.sizes) p = sizePrice(gcSel.menu, gcSelectedSize());
+  if (gcSel.sizes || gcSel.fixedSz) p = sizePrice(gcSel.menu, gcSelectedSize());
   if (p == null) p = priceFor(gcSel.menu, gcCurrentTemp());
   gcToppingsSelected().forEach(function(t){ p += t[1]; });
   if (gcSel.shots) p += gcSel.shots * GC_SHOT_PRICE;
@@ -5872,7 +5909,7 @@ function updateGcModal(){
   renderGcShots();
 }
 function openGongchaModal(menu){
-  gcSel = { menu: menu, rules: menuOptRules(menu), sizes: menuSizes(menu), shots: 0, topQtys: {} };
+  gcSel = { menu: menu, rules: menuOptRules(menu), sizes: menuSizes(menu), fixedSz: fixedSize(menu), shots: 0, topQtys: {} };
   var tw = $("gcToppings");
   if (tw){
     tw.innerHTML = GC_TOPPINGS.map(function(t){
@@ -5925,7 +5962,8 @@ function openGongchaModal(menu){
   /* 메뉴별 규칙에 따라 안 쓰는 옵션 섹션은 아예 숨긴다 (예: 스무디는 토핑만) */
   $("gcSweetWrap").classList.toggle("hidden", !gcSel.rules.sweet);
   $("gcToppingsWrap").classList.toggle("hidden", !gcSel.rules.toppings);
-  /* 사이즈(L/J)가 있는 메뉴는 팝업에서 사이즈를 골라 그 가격으로 담는다 — 기본은 L */
+  /* 사이즈가 둘(L+J)이면 팝업에서 골라 그 가격으로 담는다 — 기본은 L.
+     하나뿐(L만·J만)이면 선택지를 보여주지 않고 그 사이즈로 고정돼 담긴다 */
   var szs = gcSel.sizes;
   $("gcSizeWrap").classList.toggle("hidden", !szs);
   if (szs){
@@ -5959,7 +5997,7 @@ $("gcAddBtn").addEventListener("click", function(){
     ice: isFixedIceMenu(menu) ? "보통" : ((rules.ice && temp !== "HOT" && menu.tempType !== "none") ? (gcChecked("gcIce") || "보통") : null) };
   /* 샷추가는 커피 카테고리에서 고른 개수만 옵션에 싣는다 (가격은 단가에 이미 더해졌다) */
   if (menuCat(menu) === "커피" && gcSel.shots) opts.shots = gcSel.shots;
-  var size = gcSel.sizes ? gcSelectedSize() : "";
+  var size = gcSelectedSize();
   var key = menu.id + "|" + temp + "|gc:" + optsSig(opts) + (size ? "|size:" + size : "");
   var ex = ui.cart[key];
   if (ex) ex.qty += 1;
@@ -5995,7 +6033,7 @@ function szChecked(name){
 var szShotDelta = 0;
 function szBaseShots(){
   if (!szSel || !szSel.menu) return 1;
-  var label = szSel.sizes ? szChecked("szSize") : "";
+  var label = szSel.sizes ? szChecked("szSize") : (szSel.fixedSz ? szSel.fixedSz.label : "");
   var temp = tempLabel(szSel.menu, ui.tempSel[szSel.menu.id]);
   return baseShotCount(szSel.menu, label, temp);
 }
@@ -6031,6 +6069,9 @@ function szUnitPrice(){
   if (szSel.sizes){
     p = sizePrice(menu, szChecked("szSize"));
     if (p == null) p = priceFor(menu, temp);
+  } else if (szSel.fixedSz) {
+    /* 사이즈가 하나뿐이면 선택 없이 그 사이즈 가격이 정답이다 */
+    p = Number(szSel.fixedSz.price);
   } else {
     p = priceFor(menu, temp);
   }
@@ -6046,15 +6087,20 @@ function updateSzModal(){
 }
 function openSizeModal(menu){
   var temp = tempLabel(menu, ui.tempSel[menu.id]);
-  var szs = sizesForTemp(menu, temp);
+  var allSz = sizesForTemp(menu, temp);
+  /* 온도 기준으로 추린 사이즈가 하나뿐이면 고정 사이즈 — 선택지를 보여주지 않는다.
+     고정 사이즈만 있고 원두도 없으면 이 팝업 자체가 뜨지 않는다 (바로 담기는 경로가 맡는다) */
+  var szs = allSz && allSz.length > 1 ? allSz : null;
+  var fixedSz = allSz && allSz.length === 1 ? allSz[0] : null;
   var bns = menuBeans(menu);
   if (!szs && !bns) return;
-  szSel = { menu: menu, sizes: szs, beans: bns };
+  szSel = { menu: menu, sizes: szs, fixedSz: fixedSz, beans: bns };
   szShotDelta = 0; /* 팝업을 열면 항상 그 음료·사이즈의 기본 샷 개수에서 시작한다 */
   $("szTitle").textContent = menu.name + " — " + (szs && bns ? "사이즈·원두·샷 선택" : bns ? "원두·샷 선택" : "사이즈 선택");
   var hints = [];
   if (menu.tempType === "both") hints.push("온도는 메뉴 목록에서 고른 " + temp + "로 담겨요. 온도를 바꾸려면 팝업을 닫고 목록에서 ICE·HOT을 바꾼 뒤 다시 담아 주세요.");
   if (szs) hints.push("사이즈를 골라 주세요.");
+  if (fixedSz) hints.push("사이즈는 " + fixedSz.label + "로 고정돼 있어요.");
   if (bns) hints.push("원두를 골라 주세요. 디카페인·1/2 디카페인은 300원이 더해져요.");
   if (bns) hints.push("샷은 −/+ 버튼으로 조절해요. 숫자는 기본 샷 개수에서 시작하고, 추가할 때만 1개당 800원이 붙어요.");
   $("szHint").textContent = hints.join(" ");
@@ -6089,7 +6135,7 @@ $("szShotPlus").addEventListener("click", function(){ if (!szSel || !szSel.beans
 $("szAddBtn").addEventListener("click", function(){
   if (!szSel) return;
   var menu = szSel.menu;
-  var label = szSel.sizes ? szChecked("szSize") : "";
+  var label = szSel.sizes ? szChecked("szSize") : (szSel.fixedSz ? szSel.fixedSz.label : "");
   if (szSel.sizes && !label){ toast("사이즈를 골라 주세요."); return; }
   var bean = szSel.beans ? szChecked("szBean") : "";
   if (szSel.beans && !bean){ toast("원두를 골라 주세요."); return; }
@@ -6847,13 +6893,16 @@ function renderManage(){
       var body;
       if (list.length){
         body = '<div class="store-grid">' + list.map(function(s){
+          /* 사내 입점 매장(기본 가게 5곳)은 가게 자체를 지울 수 없어 삭제 버튼 자체를 보여주지 않는다.
+             메뉴 하나씩 지우는 건 편집 팝업에서 그대로 가능하다 */
+          var canDeleteStore = !builtinSpecFor(s);
           return '<div class="storeitem"><div class="listrow" style="padding:0;border:0"><div class="main">'
             + '<span class="sname">' + esc(s.name) + '</span>'
             + (s.desc ? '<div class="sdesc">' + esc(s.desc) + "</div>" : "")
             + '<div class="sdesc" data-store-counts="' + esc(s.id) + '">메뉴 ' + (s.menus ? s.menus.length : 0) + "개 · 카테고리 " + storeCategories(s).length + "개</div></div></div>"
             + '<div class="btnrow mt">'
             + '<button type="button" class="btn small primary" data-editstore="' + esc(s.id) + '">가게·메뉴 편집</button>'
-            + '<button type="button" class="btn small danger" data-delstore="' + esc(s.id) + '">삭제</button>'
+            + (canDeleteStore ? '<button type="button" class="btn small danger" data-delstore="' + esc(s.id) + '">삭제</button>' : "")
             + "</div></div>";
         }).join("") + "</div>";
       } else if (g.key === "external"){
@@ -6875,6 +6924,9 @@ function renderManage(){
   Array.prototype.forEach.call(sl.querySelectorAll("[data-delstore]"), function(b){
     b.addEventListener("click", function(){
       var id = b.getAttribute("data-delstore"), s = storeById(id);
+      /* 사내 입점 매장(기본 가게 5곳)은 버튼이 없어 보통 여기 오지 않지만,
+         예전 화면이 남아 있는 경우까지 막는다 — 가게 삭제만 막고 메뉴 삭제는 그대로 둔다 */
+      if (builtinSpecFor(s)){ toast("사내 입점 매장은 삭제할 수 없어요."); return; }
       /* 기본 가게를 지우면 다시 살아나지 않도록 삭제 기록에 남긴다 (공유 상태에 함께 저장·전파됨) */
       var bspec = builtinSpecFor(s);
       if (bspec){
@@ -7832,82 +7884,125 @@ function syncMenuStoreSections(){
   }
   syncGcSizeFields(); syncTousSizeFields(); updateSbPreview();
 }
+/* 사이즈 모드 라디오 값 읽기·설정 — 공차 none/L/J/LJ, 뚜레쥬르 none/R/L/RL,
+   스타벅스 none/short/tall/grande/venti/trenta/all */
+function sizeModeOf(name){
+  var r = document.querySelector('input[name="' + name + '"]:checked');
+  return r ? r.value : "none";
+}
+function setSizeMode(name, v){
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="' + name + '"]'), function(r){ r.checked = (r.value === v); });
+}
+function gcSizeMode(){ return sizeModeOf("gcSizeMode"); }
+function tousSizeMode(){ return sizeModeOf("tousSizeMode"); }
+function sbSizeMode(){ return sizeModeOf("sbSizeMode"); }
+function setSbSizeRadiosDisabled(dis){
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="sbSizeMode"]'), function(r){ r.disabled = !!dis; });
+}
+var SB_SINGLE_LABELS = { short: "Short", tall: "Tall", grande: "Grande", venti: "Venti", trenta: "Trenta" };
+/* 모드에 맞는 가격 칸만 보여준다 — 없음이면 둘 다 숨기고, 하나만이면 그 칸만, 둘이면 둘 다 */
 function syncGcSizeFields(){
-  var use = $("menuGcSizeUse"), f = $("menuGcSizeFields");
-  if (use && f) f.classList.toggle("hidden", !use.checked);
+  var mode = gcSizeMode(), f = $("menuGcSizeFields");
+  if (f) f.classList.toggle("hidden", mode === "none");
+  var lw = $("menuGcSizeLWrap"), jw = $("menuGcSizeJWrap");
+  if (lw) lw.classList.toggle("hidden", !(mode === "L" || mode === "LJ"));
+  if (jw) jw.classList.toggle("hidden", !(mode === "J" || mode === "LJ"));
 }
 function syncTousSizeFields(){
-  var use = $("menuTousSizeUse"), f = $("menuTousSizeFields");
-  if (use && f) f.classList.toggle("hidden", !use.checked);
+  var mode = tousSizeMode(), f = $("menuTousSizeFields");
+  if (f) f.classList.toggle("hidden", mode === "none");
+  var rw = $("menuTousSizeRWrap"), lw = $("menuTousSizeLWrap");
+  if (rw) rw.classList.toggle("hidden", !(mode === "R" || mode === "RL"));
+  if (lw) lw.classList.toggle("hidden", !(mode === "L" || mode === "RL"));
 }
-/* 스타벅스 기본값 — 음료(온도 구분 있음)면 사이즈 켜짐, ‘에스프레소 / 커피’거나
+/* 스타벅스 기본값 — 음료(온도 구분 있음)면 사이즈 ‘전체’, ‘에스프레소 / 커피’거나
    원두를 고르는 음료로 이름이 못박힌 메뉴면 원두도 켜짐. 사이즈 구분이 없는
-   특수 메뉴(코르타도·에스프레소 등)와 온도 구분 없는 음식은 둘 다 꺼진다 */
+   특수 메뉴(코르타도·에스프레소 등)와 온도 구분 없는 음식은 사이즈 ‘없음’이 된다.
+   편집 중에는 저장된 모드·원두를 덮지 않고 비활성 상태와 미리보기만 맞춘다 */
 function applySbDefaults(){
   if (!isStarbucksStore(manageStore())) return;
   var name = $("menuName").value.trim();
   var tt = selectedTempType();
-  /* 사이즈만 특수 메뉴·온도 구분 없음에서 꺼지고, 원두는 온도 구분이 있을 때
+  /* 사이즈만 특수 메뉴·온도 구분 없음에서 ‘없음’이 되고, 원두는 온도 구분이 있을 때
      에스프레소 기반이면 켜진다 (에스프레소·코르타도처럼 사이즈 없는 음료도 원두는 고른다) */
   var noSize = tt === "none" || SB_NO_SIZE_NAMES.indexOf(name) >= 0;
-  var sizeChk = $("menuSbSizeUse"), beanChk = $("menuSbBeanUse");
-  if (sizeChk){ sizeChk.checked = !noSize; sizeChk.disabled = noSize; }
-  if (beanChk){
-    beanChk.checked = tt !== "none" && (menuCatValue() === "에스프레소 / 커피" || SB_BEAN_NAMES.indexOf(name) >= 0);
+  var beanChk = $("menuSbBeanUse");
+  if (!ui.editMenuId){
+    setSizeMode("sbSizeMode", noSize ? "none" : "all");
+    if (beanChk){
+      beanChk.checked = tt !== "none" && (menuCatValue() === "에스프레소 / 커피" || SB_BEAN_NAMES.indexOf(name) >= 0);
+      beanChk.disabled = tt === "none";
+    }
+  } else if (beanChk){
     beanChk.disabled = tt === "none";
   }
+  setSbSizeRadiosDisabled(noSize);
   updateSbPreview();
 }
 function updateSbPreview(){
   var box = $("menuSbPreview"); if (!box) return;
   if (!isStarbucksStore(manageStore())){ box.textContent = ""; return; }
-  var sizeChk = $("menuSbSizeUse"), beanChk = $("menuSbBeanUse");
+  var beanChk = $("menuSbBeanUse");
   var name = $("menuName").value.trim();
+  var mode = sbSizeMode();
   var bits = [];
   if (SB_NO_SIZE_NAMES.indexOf(name) >= 0){
     bits.push("이 메뉴는 사이즈 구분이 없는 메뉴예요 — 가격 하나로 등록됩니다.");
-  } else if (sizeChk && sizeChk.checked){
+  } else if (mode === "all"){
     var base = currentMenuBasePrice();
     var szs = base != null ? starbucksSizes(name || "메뉴", selectedTempType(), base) : null;
     bits.push(szs ? ("사이즈: " + szs.map(function(x){ return x.label + " " + won(Number(x.price)) + (x.only === "hot" ? " (HOT 전용)" : x.only === "ice" ? " (ICE 전용)" : ""); }).join(" · "))
                   : "사이즈: Tall 가격을 입력하면 Short·Grande·Venti 가격이 자동으로 계산돼요.");
+  } else if (SB_SINGLE_LABELS[mode]){
+    var lbl = SB_SINGLE_LABELS[mode], b2 = currentMenuBasePrice();
+    bits.push(b2 != null
+      ? ("사이즈: " + lbl + " " + won(b2) + "로 고정돼요. 사이즈 선택 없이 " + lbl + "로 담겨요.")
+      : ("사이즈: 입력한 가격이 " + lbl + " 가격이 돼요. 사이즈 선택 없이 " + lbl + "로 담겨요."));
   } else bits.push("사이즈 없이 가격 하나로 등록돼요.");
   if (beanChk && beanChk.checked) bits.push("원두: 시그니처·블론드 +0원 / 디카페인·1/2 디카페인 +300원");
   box.textContent = bits.join("\n");
 }
-/* 편집을 열 때 메뉴에 저장된 사이즈·원두를 입력란에 그대로 채운다 */
+/* 편집을 열 때 메뉴에 저장된 사이즈·원두를 입력란에 그대로 채운다 —
+   사이즈가 하나뿐이면 ‘L만’·‘J만’·‘LARGE만’·‘Tall만’ 같은 단일 모드로 복원한다 */
 function fillMenuStoreFields(menu){
   syncMenuStoreSections();
   var szs = menu && Array.isArray(menu.sizes) ? menu.sizes : [];
   function sizeOf(label){ for (var i = 0; i < szs.length; i++) if (szs[i].label === label) return Number(szs[i].price); return ""; }
-  var gcUse = $("menuGcSizeUse");
-  if (gcUse){
-    gcUse.checked = isGongchaStore(manageStore()) && !!(sizeOf("L") !== "" && sizeOf("J") !== "");
+  if (isGongchaStore(manageStore())){
+    var hasL = sizeOf("L") !== "", hasJ = sizeOf("J") !== "";
+    setSizeMode("gcSizeMode", hasL && hasJ ? "LJ" : hasL ? "L" : hasJ ? "J" : "none");
     $("menuGcSizeL").value = sizeOf("L");
     $("menuGcSizeJ").value = sizeOf("J");
     syncGcSizeFields();
   }
-  var tousUse = $("menuTousSizeUse");
-  if (tousUse){
-    tousUse.checked = isTousStore(manageStore()) && !!(sizeOf("REGULAR") !== "" && sizeOf("LARGE") !== "");
+  if (isTousStore(manageStore())){
+    var hasR = sizeOf("REGULAR") !== "", hasLg = sizeOf("LARGE") !== "";
+    setSizeMode("tousSizeMode", hasR && hasLg ? "RL" : hasR ? "R" : hasLg ? "L" : "none");
     $("menuTousSizeR").value = sizeOf("REGULAR");
     $("menuTousSizeL").value = sizeOf("LARGE");
     syncTousSizeFields();
   }
   if (isStarbucksStore(manageStore())){
-    var hasSizes = !!menuSizes(menu), hasBeans = !!menuBeans(menu);
-    var sc = $("menuSbSizeUse"), bc = $("menuSbBeanUse");
-    if (sc){ sc.checked = hasSizes; sc.disabled = selectedTempType() === "none" || SB_NO_SIZE_NAMES.indexOf(String(menu.name || "")) >= 0; }
+    var raw = rawSizes(menu);
+    var sbMode = "none";
+    if (raw && raw.length === 1){
+      var one = String(raw[0].label || "").toLowerCase();
+      sbMode = SB_SINGLE_LABELS[one] ? one : "none";
+    } else if (raw && raw.length > 1) sbMode = "all";
+    setSizeMode("sbSizeMode", sbMode);
+    setSbSizeRadiosDisabled(selectedTempType() === "none" || SB_NO_SIZE_NAMES.indexOf(String(menu.name || "")) >= 0);
+    var hasBeans = !!(menu && Array.isArray(menu.beans) && menu.beans.length);
+    var bc = $("menuSbBeanUse");
     if (bc){ bc.checked = hasBeans; bc.disabled = selectedTempType() === "none"; }
     updateSbPreview();
   }
 }
 /* 새 메뉴용으로 입력란을 비우고 가게 기본값을 세운다 */
 function resetMenuStoreFields(){
-  var gcUse = $("menuGcSizeUse"); if (gcUse) gcUse.checked = false;
+  setSizeMode("gcSizeMode", "none");
   if ($("menuGcSizeL")) $("menuGcSizeL").value = "";
   if ($("menuGcSizeJ")) $("menuGcSizeJ").value = "";
-  var tousUse = $("menuTousSizeUse"); if (tousUse) tousUse.checked = false;
+  setSizeMode("tousSizeMode", "none");
   if ($("menuTousSizeR")) $("menuTousSizeR").value = "";
   if ($("menuTousSizeL")) $("menuTousSizeL").value = "";
   syncMenuStoreSections();
@@ -7919,11 +8014,24 @@ function prefillFirstSize(inputId){
   var base = currentMenuBasePrice();
   if (base != null) el.value = base;
 }
-var _gcSizeUseEl = $("menuGcSizeUse");
-if (_gcSizeUseEl) _gcSizeUseEl.addEventListener("change", function(){ syncGcSizeFields(); if (_gcSizeUseEl.checked) prefillFirstSize("menuGcSizeL"); });
-var _tousSizeUseEl = $("menuTousSizeUse");
-if (_tousSizeUseEl) _tousSizeUseEl.addEventListener("change", function(){ syncTousSizeFields(); if (_tousSizeUseEl.checked) prefillFirstSize("menuTousSizeR"); });
-var _sbSizeUseEl = $("menuSbSizeUse"); if (_sbSizeUseEl) _sbSizeUseEl.addEventListener("change", updateSbPreview);
+/* 사이즈 모드를 고르면 그 모드의 첫 가격 칸에 기본 가격을 미리 옮겨 준다 */
+Array.prototype.forEach.call(document.querySelectorAll('input[name="gcSizeMode"]'), function(r){
+  r.addEventListener("change", function(){
+    syncGcSizeFields();
+    if (r.value === "L" || r.value === "LJ") prefillFirstSize("menuGcSizeL");
+    if (r.value === "J") prefillFirstSize("menuGcSizeJ");
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll('input[name="tousSizeMode"]'), function(r){
+  r.addEventListener("change", function(){
+    syncTousSizeFields();
+    if (r.value === "R" || r.value === "RL") prefillFirstSize("menuTousSizeR");
+    if (r.value === "L") prefillFirstSize("menuTousSizeL");
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll('input[name="sbSizeMode"]'), function(r){
+  r.addEventListener("change", updateSbPreview);
+});
 var _sbBeanUseEl = $("menuSbBeanUse"); if (_sbBeanUseEl) _sbBeanUseEl.addEventListener("change", updateSbPreview);
 ["menuPrice", "menuPriceIce", "menuPriceHot", "menuName"].forEach(function(id){
   var el = $(id); if (el) el.addEventListener("input", updateSbPreview);
@@ -7932,10 +8040,16 @@ if ($("menuName")) $("menuName").addEventListener("change", function(){ if (!ui.
 Array.prototype.forEach.call(document.querySelectorAll('input[name="tempType"]'), function(r){
   r.addEventListener("change", function(){
     if (!ui.editMenuId){ applySbDefaults(); return; }
-    /* 편집 중 온도 구분을 ‘구분없음’으로 바꾸면 사이즈·원두도 함께 꺼진다 */
-    var sc = $("menuSbSizeUse"), bc = $("menuSbBeanUse");
-    if (sc && bc && selectedTempType() === "none"){ sc.checked = false; sc.disabled = true; bc.checked = false; bc.disabled = true; }
-    else if (sc && bc){ sc.disabled = SB_NO_SIZE_NAMES.indexOf($("menuName").value.trim()) >= 0; bc.disabled = false; }
+    /* 편집 중 온도 구분을 ‘구분없음’으로 바꾸면 사이즈는 ‘없음’으로, 원두도 함께 꺼진다 */
+    var bc = $("menuSbBeanUse");
+    if (selectedTempType() === "none"){
+      setSizeMode("sbSizeMode", "none");
+      setSbSizeRadiosDisabled(true);
+      if (bc){ bc.checked = false; bc.disabled = true; }
+    } else {
+      setSbSizeRadiosDisabled(SB_NO_SIZE_NAMES.indexOf($("menuName").value.trim()) >= 0);
+      if (bc) bc.disabled = false;
+    }
     updateSbPreview();
   });
 });
@@ -7945,24 +8059,56 @@ Array.prototype.forEach.call(document.querySelectorAll('input[name="tempType"]')
 function menuStoreFieldsValue(name, tt, basePrice){
   var s = manageStore();
   if (isGongchaStore(s)){
-    if (!$("menuGcSizeUse").checked) return { sizes: null, beans: null };
+    var gm = gcSizeMode();
+    if (gm === "none") return { sizes: null, beans: null };
     var gl = parseInt($("menuGcSizeL").value, 10), gj = parseInt($("menuGcSizeJ").value, 10);
+    if (gm === "L"){
+      if (isNaN(gl) || gl < 0) return { error: "L 가격을 숫자로 입력하세요.", focus: "menuGcSizeL" };
+      return { sizes: [{ label: "L", price: gl }], beans: null, baseOverride: gl };
+    }
+    if (gm === "J"){
+      if (isNaN(gj) || gj < 0) return { error: "J 가격을 숫자로 입력하세요.", focus: "menuGcSizeJ" };
+      return { sizes: [{ label: "J", price: gj }], beans: null, baseOverride: gj };
+    }
     if (isNaN(gl) || gl < 0) return { error: "L 가격을 숫자로 입력하세요.", focus: "menuGcSizeL" };
     if (isNaN(gj) || gj < 0) return { error: "J 가격을 숫자로 입력하세요.", focus: "menuGcSizeJ" };
     return { sizes: [{ label: "L", price: gl }, { label: "J", price: gj }], beans: null, baseOverride: gl };
   }
   if (isTousStore(s)){
-    if (!$("menuTousSizeUse").checked) return { sizes: null, beans: null };
+    var tm = tousSizeMode();
+    if (tm === "none") return { sizes: null, beans: null };
     var tr = parseInt($("menuTousSizeR").value, 10), tl = parseInt($("menuTousSizeL").value, 10);
+    if (tm === "R"){
+      if (isNaN(tr) || tr < 0) return { error: "REGULAR 가격을 숫자로 입력하세요.", focus: "menuTousSizeR" };
+      return { sizes: [{ label: "REGULAR", price: tr }], beans: null, baseOverride: tr };
+    }
+    if (tm === "L"){
+      if (isNaN(tl) || tl < 0) return { error: "LARGE 가격을 숫자로 입력하세요.", focus: "menuTousSizeL" };
+      return { sizes: [{ label: "LARGE", price: tl }], beans: null, baseOverride: tl };
+    }
     if (isNaN(tr) || tr < 0) return { error: "REGULAR 가격을 숫자로 입력하세요.", focus: "menuTousSizeR" };
     if (isNaN(tl) || tl < 0) return { error: "LARGE 가격을 숫자로 입력하세요.", focus: "menuTousSizeL" };
     return { sizes: [{ label: "REGULAR", price: tr }, { label: "LARGE", price: tl }], beans: null, baseOverride: tr };
   }
   if (isStarbucksStore(s)){
     var sizes = null, beans = null;
-    if ($("menuSbSizeUse").checked && !$("menuSbSizeUse").disabled){
-      sizes = starbucksSizes(name, tt, basePrice);
-      if (!sizes) return { error: "이 메뉴는 사이즈를 붙일 수 없어요. 사이즈 선택을 꺼 주세요.", focus: "menuSbSizeUse" };
+    var sm = sbSizeMode();
+    var sbRadio = document.querySelector('input[name="sbSizeMode"]:checked');
+    var sbDisabled = !!(sbRadio && sbRadio.disabled);
+    if (sm !== "none" && !sbDisabled){
+      if (SB_NO_SIZE_NAMES.indexOf(name) >= 0)
+        return { error: "이 메뉴는 사이즈를 붙일 수 없어요. 사이즈를 ‘없음’으로 바꿔 주세요.", focus: "menuSbModeAll" };
+      if (tt === "none")
+        return { error: "온도 구분이 없는 메뉴는 사이즈를 붙일 수 없어요. 사이즈를 ‘없음’으로 바꿔 주세요.", focus: "menuSbModeAll" };
+      if (sm === "all"){
+        sizes = starbucksSizes(name, tt, basePrice);
+        if (!sizes) return { error: "이 메뉴는 사이즈를 붙일 수 없어요. 사이즈를 ‘없음’으로 바꿔 주세요.", focus: "menuSbModeAll" };
+      } else if (SB_SINGLE_LABELS[sm]){
+        /* 단일 사이즈 — 입력한 가격(기준 가격)이 곧 그 사이즈 가격이다 */
+        if (basePrice == null || isNaN(basePrice) || basePrice < 0)
+          return { error: SB_SINGLE_LABELS[sm] + " 가격을 숫자로 입력하세요.", focus: "menuPrice" };
+        sizes = [{ label: SB_SINGLE_LABELS[sm], price: basePrice }];
+      }
     }
     if ($("menuSbBeanUse").checked && !$("menuSbBeanUse").disabled)
       beans = SB_BEANS.map(function(b){ return { label: b.label, add: b.add }; });
