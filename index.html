@@ -214,8 +214,15 @@
       /* 내 주문 항목별 요청사항 메모 입력칸 */
       .noteinput{width:100%;margin-top:6px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:12px;padding:7px 11px;min-height:36px;font-size:14px}
       .noteinput::placeholder{color:var(--muted)}
-      /* 전체 주문 탭 — 메뉴 하나에 한 줄, 줄 사이는 살짝만 띄운다 */
+      /* 전체 주문 탭 — 메뉴 하나에 한 줄, 줄 사이는 살짝만 띄운다.
+         이름은 왼쪽에서 늘어나고 수량은 고정폭 오른쪽 열에 맞춰, 이름 길이가 달라도
+         수량 줄이 곧게 선다. 사람별 금액도 고정폭 열로 맞춰 수량 열의 오른쪽 끝이
+         행마다 흔들리지 않게 한다 */
+      .listrow .detail .dline{display:flex;align-items:baseline;gap:10px}
       .listrow .detail .dline + .dline{margin-top:2px}
+      .listrow .detail .dline .dname{flex:1 1 auto;min-width:0}
+      .listrow .detail .dline .dqty{flex:none;min-width:34px;text-align:right;font-weight:800;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+      #ordersList .listrow .amount{flex:none;min-width:78px;text-align:right}
       /* 내 주문 항목 — 메뉴 하나에 한 줄: 왼쪽 이름(옵션)·단가, 오른쪽 수량 스테퍼·
          그 메뉴 금액·삭제 버튼. 장바구니로 되돌리지 않고 제출된 주문에서 바로
          메뉴별로 수량을 조절하거나 그 메뉴만 지울 수 있다.
@@ -286,10 +293,13 @@
       .statusline .sl{flex:0 0 118px;font-size:13px;font-weight:800;color:var(--muted)}
       .statusline .sn{flex:1 1 200px;font-size:14.5px}
       .statusline .sn.none{color:var(--muted)}
-      .menuagg{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}
+      /* 메뉴별 합계 행 — 이름은 왼쪽에서 늘어나고, 수량·금액은 고정폭 오른쪽 열에 맞춰
+         메뉴 이름 길이와 금액 자릿수가 행마다 달라도 수량 줄이 곧게 선다 */
+      .menuagg{display:flex;gap:6px 10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}
       .menuagg:last-child{border-bottom:0}
-      .menuagg .an{font-weight:800;flex:1 1 150px}
-      .menuagg .aq{font-weight:800;color:var(--green-text)}
+      .menuagg .an{font-weight:800;flex:1 1 auto;min-width:0}
+      .menuagg .aq{font-weight:800;color:var(--green-text);flex:none;min-width:42px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+      .menuagg .amount{flex:none;min-width:78px;text-align:right}
       .menuagg .awho{flex:1 1 100%;color:var(--muted);font-size:13px}
       .storeitem{border:1px solid var(--line);border-radius:20px;padding:9px 11px;background:var(--surface-2)}
       .storeitem + .storeitem{margin-top:8px}
@@ -5769,7 +5779,7 @@ function renderOrdersList(){
     g.total += orderTotal(o);
   });
   el.innerHTML = groups.map(function(g){
-    var detail = g.items.map(function(it){ var suf = itemSuffix(it); return '<div class="dline">' + esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty + "</div>"; }).join("");
+    var detail = g.items.map(function(it){ var suf = itemSuffix(it); return '<div class="dline"><span class="dname">' + esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + '</span><span class="dqty">×' + it.qty + "</span></div>"; }).join("");
     return '<div class="listrow"><div class="main"><span class="who">' + esc(g.name) + '</span> <span class="tempbadge">' + esc(g.group) + "</span>"
       + '<div class="detail">' + detail + '</div></div>'
       + '<span class="amount">' + won(g.total) + "</span></div>";
