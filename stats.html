@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morder 통계 (개발자 전용)</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;background:#f3f6f4;color:#1c2b26}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:24px;margin:8px 0 4px}
+h1 .brand{color:#2f6b5e}
+.sub{color:#6b7d76;font-size:13px;margin:0 0 20px}
+.card{background:#fff;border:1px solid #dde7e1;border-radius:16px;padding:18px;margin-bottom:16px}
+.lock{max-width:420px;margin:64px auto 0;text-align:center}
+.lock input{width:100%;padding:13px 14px;border:1.5px solid #cfe0d7;border-radius:12px;font-size:16px;margin:12px 0 10px}
+.btn{background:#2f6b5e;color:#fff;border:0;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.5}
+.err{color:#c0392b;font-size:14px;min-height:20px;margin-top:8px}
+.hidden{display:none!important}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.toolbar select{padding:10px 12px;border:1.5px solid #cfe0d7;border-radius:10px;font-size:15px;background:#fff}
+.toolbar .btn{padding:10px 18px;font-size:14px}
+.status{color:#6b7d76;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:#fff;border:1px solid #dde7e1;border-radius:16px;padding:16px}
+.stat .label{font-size:13px;color:#6b7d76;line-height:1.4}
+.stat .num{font-size:30px;font-weight:800;margin-top:6px;color:#1c2b26}
+.stat .num em{font-style:normal;font-size:14px;font-weight:600;color:#6b7d76}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px;border-bottom:1px solid #e6eee9;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{color:#47635a;border-bottom:2px solid #cfe0d7}
+tbody tr:last-child td{border-bottom:0}
+.empty{color:#6b7d76;text-align:center;padding:24px 0;font-size:14px}
+h2{font-size:17px;margin:4px 0 14px}
+.bar-row{display:grid;grid-template-columns:86px 1fr 44px;gap:10px;align-items:center;margin:7px 0;font-size:13px}
+.bar-track{background:#e9f1ec;border-radius:999px;height:18px;overflow:hidden}
+.bar-fill{background:#2f6b5e;height:100%;border-radius:999px;min-width:0}
+.bar-num{text-align:right;font-weight:700}
+.legend{font-size:12px;color:#6b7d76;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 비밀번호 잠금 -->
+  <div id="lockView" class="card lock">
+    <h1><span class="brand">Morder</span> 통계</h1>
+    <p class="sub">개발자 전용 페이지입니다. 비밀번호를 입력해 주세요.</p>
+    <form id="lockForm">
+      <input type="password" id="pwInput" placeholder="비밀번호" autocomplete="current-password">
+      <button type="submit" class="btn" style="width:100%">열기</button>
+      <div class="err" id="lockErr"></div>
+    </form>
+  </div>
+
+  <!-- 통계 -->
+  <div id="statsView" class="hidden">
+    <h1><span class="brand">Morder</span> 통계</h1>
+    <p class="sub">익명 기기 ID 기준 집계입니다. 이름·전화번호 등 개인정보는 표시하지 않습니다.</p>
+    <div class="toolbar">
+      <select id="periodSel" aria-label="기간 선택">
+        <option value="7">최근 7일</option>
+        <option value="14">최근 14일</option>
+        <option value="30" selected>최근 30일</option>
+      </select>
+      <button type="button" class="btn" id="refreshBtn">새로고침</button>
+      <span class="status" id="statusText"></span>
+    </div>
+    <div class="cards" id="totalCards"></div>
+    <div class="card">
+      <h2>일별 통계</h2>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>날짜</th><th>생성 페이지 기기</th><th>취합 페이지 기기</th>
+          <th>취합 창 생성</th><th>주문 제출</th><th>Skip</th>
+        </tr></thead>
+        <tbody id="dailyBody"></tbody>
+      </table>
+      </div>
+      <div class="empty hidden" id="dailyEmpty">이 기간에 기록된 데이터가 없습니다.</div>
+    </div>
+    <div class="card">
+      <h2>날짜별 기기 수</h2>
+      <div id="bars"></div>
+      <p class="legend">막대 = 그날 접속한 익명 기기 수 (생성·취합 페이지 합집합, 기기당 1회)</p>
+      <div class="empty hidden" id="barsEmpty">표시할 데이터가 없습니다.</div>
+    </div>
+  </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+var EXPECTED_HASH = "e6eda40bda17e3a6f9c1d911c6d680d2e558744103f3f9bd02b8934911adfc88";
+var UNLOCK_KEY = "morder_stats_unlocked";
+
+firebase.initializeApp({
+  apiKey: "AIzaSyBZ-oLvXPahBb2nf7eEfGWE_Yo5J3vdgZ8",
+  authDomain: "ordercollect-54f46.firebaseapp.com",
+  projectId: "ordercollect-54f46",
+  storageBucket: "ordercollect-54f46.firebasestorage.app",
+  messagingSenderId: "763398349826",
+  appId: "1:763398349826:web:414d78a6b591eaaaf5331b"
+});
+var db = firebase.firestore();
+
+function kstDateStr(d) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(d);
+}
+function addDays(dateStr, n) {
+  var p = dateStr.split("-");
+  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
+  return d.toISOString().slice(0, 10);
+}
+function kstMidnightDate(dateStr) {
+  // KST(UTC+9) 자정 = 전날 15:00 UTC
+  var p = dateStr.split("-");
+  return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], -9, 0, 0));
+}
+function dateRange(days) {
+  var today = kstDateStr(new Date());
+  var out = [];
+  for (var i = days - 1; i >= 0; i--) out.push(addDays(today, -i));
+  return out; // 오름차순
+}
+
+async function sha256Hex(text) {
+  var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(function (b) {
+    return b.toString(16).padStart(2, "0");
+  }).join("");
+}
+
+function showStats() {
+  document.getElementById("lockView").classList.add("hidden");
+  document.getElementById("statsView").classList.remove("hidden");
+  loadStats();
+}
+document.getElementById("lockForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  var v = document.getElementById("pwInput").value;
+  var err = document.getElementById("lockErr");
+  try {
+    var h = await sha256Hex(v);
+    if (h === EXPECTED_HASH) {
+      sessionStorage.setItem(UNLOCK_KEY, "1");
+      err.textContent = "";
+      showStats();
+    } else {
+      err.textContent = "비밀번호가 맞지 않습니다.";
+    }
+  } catch (ex) {
+    err.textContent = "확인 중 오류가 발생했습니다.";
+  }
+});
+if (sessionStorage.getItem(UNLOCK_KEY) === "1") showStats();
+
+async function loadStats() {
+  var days = parseInt(document.getElementById("periodSel").value, 10) || 30;
+  var dates = dateRange(days);
+  var start = kstMidnightDate(dates[0]);
+  var status = document.getElementById("statusText");
+  var btn = document.getElementById("refreshBtn");
+  status.textContent = "불러오는 중…";
+  btn.disabled = true;
+
+  var daily = {};
+  dates.forEach(function (ds) {
+    daily[ds] = {
+      createDevs: new Set(), orderDevs: new Set(), allDevs: new Set(),
+      created: 0, orders: 0, skips: 0
+    };
+  });
+  var totCreateDevs = new Set(), totOrderDevs = new Set();
+  var totCreated = 0, totOrders = 0, totSkips = 0, totalDocs = 0;
+
+  try {
+    var snap = await db.collection("oc_analytics")
+      .where("t", ">=", firebase.firestore.Timestamp.fromDate(start))
+      .get();
+    snap.forEach(function (doc) {
+      var d = doc.data();
+      if (!d || !d.t || typeof d.t.toDate !== "function") return;
+      var ds = kstDateStr(d.t.toDate());
+      var row = daily[ds];
+      if (!row) return;
+      totalDocs++;
+      if (d.type === "pageview") {
+        if (d.dev) {
+          row.allDevs.add(d.dev);
+          if (d.page === "create") { row.createDevs.add(d.dev); totCreateDevs.add(d.dev); }
+          if (d.page === "order") { row.orderDevs.add(d.dev); totOrderDevs.add(d.dev); }
+        }
+      } else if (d.type === "channel_created") { row.created++; totCreated++; }
+      else if (d.type === "order_submitted") { row.orders++; totOrders++; }
+      else if (d.type === "skip") { row.skips++; totSkips++; }
+    });
+  } catch (ex) {
+    status.textContent = "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    btn.disabled = false;
+    return;
+  }
+
+  var cards = [
+    ["생성 페이지 기기 수", totCreateDevs.size, "대"],
+    ["취합 페이지 기기 수", totOrderDevs.size, "대"],
+    ["취합 창 생성 수", totCreated, "회"],
+    ["주문 제출 수", totOrders, "회"],
+    ["Skip 수", totSkips, "회"]
+  ];
+  document.getElementById("totalCards").innerHTML = cards.map(function (c) {
+    return '<div class="stat"><div class="label">' + c[0] +
+      '</div><div class="num">' + c[1].toLocaleString("ko-KR") +
+      ' <em>' + c[2] + "</em></div></div>";
+  }).join("");
+
+  document.getElementById("dailyBody").innerHTML = dates.map(function (ds) {
+    var r = daily[ds];
+    return "<tr><td>" + ds + "</td><td>" + r.createDevs.size + "</td><td>" +
+      r.orderDevs.size + "</td><td>" + r.created + "</td><td>" +
+      r.orders + "</td><td>" + r.skips + "</td></tr>";
+  }).join("");
+  document.getElementById("dailyEmpty").classList.toggle("hidden", totalDocs > 0);
+
+  var maxDevs = 0;
+  dates.forEach(function (ds) { maxDevs = Math.max(maxDevs, daily[ds].allDevs.size); });
+  document.getElementById("bars").innerHTML = dates.map(function (ds) {
+    var n = daily[ds].allDevs.size;
+    var pct = maxDevs > 0 ? Math.round(n / maxDevs * 100) : 0;
+    return '<div class="bar-row"><span>' + ds.slice(5) +
+      '</span><div class="bar-track"><div class="bar-fill" style="width:' +
+      pct + '%"></div></div><span class="bar-num">' + n + "</span></div>";
+  }).join("");
+  document.getElementById("barsEmpty").classList.toggle("hidden", totalDocs > 0);
+
+  status.textContent = dates[0] + " ~ " + dates[dates.length - 1] +
+    " · 이벤트 " + totalDocs.toLocaleString("ko-KR") + "건";
+  btn.disabled = false;
+}
+document.getElementById("periodSel").addEventListener("change", loadStats);
+document.getElementById("refreshBtn").addEventListener("click", loadStats);
+</script>
+</body>
+</html>
