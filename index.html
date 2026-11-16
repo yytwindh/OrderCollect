@@ -236,6 +236,10 @@
       .totalbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:var(--accent-soft);border-radius:20px;padding:10px 14px;margin-top:10px}
       .totalbar .t{font-size:14px;font-weight:700}
       .totalbar .v{font-size:21px;font-weight:800}
+      /* 내 주문 합계 바 — 주문이 있어도 Skip 버튼을 합계 왼쪽에 나란히 둔다.
+         합계(라벨+금액)는 한 묶음으로 오른쪽에 붙이고, Skip 버튼은 왼쪽에 고정한다 */
+      .totalbar .myorder-total{display:inline-flex;align-items:baseline;gap:8px;margin-left:auto;white-space:nowrap}
+      .totalbar #skipBtn{flex:none}
       /* 제출된 주문 숫자 5칸 — 첫째 줄 총액·전체 수량 2칸, 둘째 줄 주문 완료·Skip·아직 안 함 3칸.
          6열 그리드에서 앞 2칸은 3열씩, 뒤 3칸은 2열씩 나눠 가져 줄 나눔을 고정한다 */
       .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:stretch}
@@ -5645,6 +5649,7 @@ function mySkipEntry(){ return ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? ski
    내가 주문했으면 내가 시킨 메뉴를 하나씩 한 줄로 펼쳐 보여 주고 아래에 합계를 둔다.
    각 줄에서 바로 메뉴별 수량을 −/+로 조절하거나(수량이 0이 되면 그 메뉴가 빠진다)
    삭제 버튼으로 그 메뉴만 지울 수 있다 — 장바구니로 되돌렸다 다시 제출할 필요가 없다.
+   주문이 있어도 합계 바 왼쪽에 초록 Skip 버튼을 그대로 둔다 — 누르면 주문이 취소되고 Skip으로 바뀐다.
    Skip을 눌렀으면 ‘이름’ · Skip · 주문 안 함과 Skip 취소 버튼을 보여 준다 */
 function renderMyOrder(){
   var body = $("myOrderBody"); if (!body) return;
@@ -5708,7 +5713,9 @@ function renderMyOrder(){
     });
   });
   body.innerHTML = itemRows.join("")
-    + '<div class="totalbar"><span class="t">합계</span><span class="v">' + won(sum) + "</span></div>";
+    + '<div class="totalbar"><button type="button" class="btn green" id="skipBtn">Skip</button>'
+    + '<span class="myorder-total"><span class="t">합계</span><span class="v">' + won(sum) + "</span></span></div>";
+  bindSkipBtn();
   function parseRef(b, attr){
     var parts = String(b.getAttribute(attr) || "").split("|");
     return { orderId: parts[0], idx: parseInt(parts[1], 10) };
