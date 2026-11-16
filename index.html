@@ -228,13 +228,19 @@
       .noteinput::placeholder{color:var(--muted)}
       /* 전체 주문 탭 — 메뉴 하나에 한 줄, 줄 사이는 살짝만 띄운다 */
       .listrow .detail .dline + .dline{margin-top:2px}
-      /* 내 주문 항목 — 메뉴 하나에 한 줄, 왼쪽 이름(옵션·수량)·오른쪽 그 메뉴 금액.
-         이름이 길어도 금액이 아래 줄로 밀리지 않게 줄바꿈을 막고 이름 쪽만 줄어들게 한다 */
-      .myorder-item{flex-wrap:nowrap;align-items:center}
-      .myorder-item .main{flex:1 1 auto}
+      /* 내 주문 항목 — 메뉴 하나에 한 줄: 왼쪽 이름(옵션)·단가, 오른쪽 수량 스테퍼·
+         그 메뉴 금액·삭제 버튼. 장바구니로 되돌리지 않고 제출된 주문에서 바로
+         메뉴별로 수량을 조절하거나 그 메뉴만 지울 수 있다.
+         좁은 화면에서는 조절 묶음이 둘째 줄 오른쪽으로 내려가 이름이 잘리지 않게 한다 */
+      .myorder-item{flex-wrap:wrap;align-items:center;gap:6px 10px}
+      .myorder-item .main{flex:1 1 150px}
       .myorder-item .who{font-size:14.5px;line-height:1.4}
-      .myorder-item .amount{flex:none}
-      .myorder-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+      .myorder-item .amount{flex:none;min-width:62px;text-align:right}
+      .myorder-ctl{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}
+      .myorder-del{width:30px;height:30px;min-height:30px;border-radius:50%;border:1px solid var(--danger-line);
+        background:var(--danger-soft);color:var(--danger);display:inline-flex;align-items:center;justify-content:center;
+        padding:0;flex:none;cursor:pointer}
+      .myorder-del:focus-visible{outline:2px solid var(--danger);outline-offset:2px}
       .amount{font-weight:800;white-space:nowrap}
       .empty{border:1.5px dashed var(--line-strong);border-radius:20px;padding:14px 12px;text-align:center;color:var(--muted);font-size:14px;background:var(--surface-2)}
       .empty strong{color:var(--ink);display:block;font-size:15.5px;margin-bottom:4px}
@@ -5275,8 +5281,8 @@ function startNewOrder(){
    각 칩에는 이름만 보이고, 주문했으면 ‘주문 완료’, Skip이면 ‘Skip’ 표시가 이름 옆에 붙는다.
    칩을 누르면 그 사람이 나로 선택된다 (선택된 칩은 .sel로 표시된다).
    이미 선택된 내 칩을 한 번 더 누르면 선택이 취소돼 이름 미선택 상태로 돌아간다.
-   내 상태 알약이나 별도 취소 버튼은 두지 않는다 — 내 주문 취소는 장바구니 아래 ‘내 주문’ 카드에서
-   제출된 주문마다 ‘삭제하고 장바구니에 다시 담기’로 한다 */
+   내 상태 알약이나 별도 취소 버튼은 두지 않는다 — 제출한 주문의 수정·취소는
+   장바구니 아래 ‘내 주문’ 카드에서 메뉴별로 수량을 조절하거나 삭제해 바로 한다 */
 function renderRoster(){
   var area = $("nameSelectArea"); if (!area) return;
   var flat = rosterFlat(activeChannel().parts, activeChannel().absent, chCtx(activeChannel()));
@@ -5717,71 +5723,64 @@ function renderCart(){
   if (mTotalEl) mTotalEl.textContent = won(tot);
   if (typeof updateMobileNameChip === "function") updateMobileNameChip();
 }
-/* 제출된 주문을 삭제하고 그 메뉴를 장바구니로 되돌린다 — 고쳐서 다시 제출할 수 있게 */
-function restoreOrderToCart(orderId){
-  var target = null;
-  activeChannel().orders.forEach(function(o){ if (o.id === orderId) target = o; });
-  if (!target) return;
-  var rs = roundStore();
-  (target.items || []).forEach(function(it){
-    var menu = null;
-    if (rs && Array.isArray(rs.menus)) rs.menus.forEach(function(m){ if (!menu && m.name === it.name) menu = m; });
-    var temp = it.temp || "";
-    var optsCopy = it.opts ? { toppings: (it.opts.toppings || []).slice(), sweet: it.opts.sweet, ice: it.opts.ice, shots: it.opts.shots || 0 } : null;
-    if (optsCopy && !optsCopy.shots) delete optsCopy.shots;
-    var sizeCopy = it.size || null;
-    var beanCopy = it.bean || null;
-    var shotsCopy = it.shots || null;
-    var noteCopy = it.note || null;
-    if (menu){
-      if (temp) ui.tempSel[menu.id] = temp;
-      var t = tempLabel(menu, temp || ui.tempSel[menu.id]);
-      /* 공차 옵션·사이즈·원두·샷 항목은 조합 키로 되돌리고, 단가도 주문 당시 가격 그대로 복원한다.
-         메모는 장바구니에서 고칠 수 있는 값이라 키에 넣지 않고 항목에 그대로 실어 되돌린다 */
-      var key = optsCopy ? (menu.id + "|" + t + "|gc:" + optsSig(optsCopy) + (sizeCopy ? "|size:" + sizeCopy : ""))
-        : (sizeCopy || beanCopy || shotsCopy) ? ((menu.tempType === "both" ? menu.id + "|" + t : menu.id) + (sizeCopy ? "|size:" + sizeCopy : "") + (beanCopy ? "|bean:" + beanCopy : "") + (shotsCopy ? "|shot:" + shotsCopy : ""))
-        : (menu.tempType === "both" ? menu.id + "|" + (temp || "ICE") : menu.id);
-      var existing = ui.cart[key];
-      if (existing){ existing.qty += it.qty; if (noteCopy && !existing.note) existing.note = noteCopy; }
-      else {
-        var entry = { menuId: menu.id, name: menu.name, price: (optsCopy || sizeCopy || beanCopy || shotsCopy) ? (Number(it.price) || 0) : priceFor(menu, t), tempType: menu.tempType, cat: menuCat(menu), temp: t, qty: it.qty };
-        if (optsCopy) entry.opts = optsCopy;
-        if (sizeCopy) entry.size = sizeCopy;
-        if (beanCopy) entry.bean = beanCopy;
-        if (shotsCopy) entry.shots = shotsCopy;
-        if (noteCopy) entry.note = noteCopy;
-        ui.cart[key] = entry;
-      }
-    } else {
-      var key2 = "restored|" + it.name + "|" + temp + "|" + optsSig(it.opts) + "|" + (sizeCopy || "") + "|" + (beanCopy || "") + "|" + (shotsCopy || "");
-      var ex2 = ui.cart[key2];
-      if (ex2){ ex2.qty += it.qty; if (noteCopy && !ex2.note) ex2.note = noteCopy; }
-      else {
-        var e2 = { menuId: key2, name: it.name, price: Number(it.price) || 0, tempType: temp ? "both" : "none", cat: it.cat || "", temp: temp, qty: it.qty };
-        if (optsCopy) e2.opts = optsCopy;
-        if (sizeCopy) e2.size = sizeCopy;
-        if (beanCopy) e2.bean = beanCopy;
-        if (shotsCopy) e2.shots = shotsCopy;
-        if (noteCopy) e2.note = noteCopy;
-        ui.cart[key2] = e2;
-      }
+/* 제출된 내 주문 항목을 그 자리에서 고친다 — 장바구니로 되돌렸다 다시 제출하지 않고
+   메뉴별로 수량을 조절하거나 그 메뉴만 삭제한다. 주문 항목(id)은 그대로 둔 채
+   내용만 고치고 제출 시각(ts)만 새로 찍는다: 제출을 더할 때와 같은 방식이라
+   동기화 병합의 ‘한 사람 주문은 하나’ 규칙과도 어긋나지 않는다.
+   항목이 전부 사라진 주문은 삭제 기록(dropOrderById)을 남기고 지운다 */
+/* 수량을 늘릴 때 채널 제한(이미 제출한 주문 + 장바구니 합산)을 넘는지 본다. 통과하면 "" */
+function myOrderIncreaseViolation(it){
+  var lim = sanitizeLimits(activeChannel().limits);
+  var cat = submittedItemCat(it);
+  if (cat && (cat in lim.cats)){
+    if (lim.cats[cat] === 0) return "이번 주문에서는 " + cat + josa(cat, "을", "를") + " 주문할 수 없어요.";
+    if (mySubmittedCatQty(cat) + cartCatQty(cat) + 1 > lim.cats[cat]){
+      return cat + josa(cat, "은", "는") + " 최대 " + lim.cats[cat] + "개까지만 주문할 수 있어요.";
     }
-  });
-  dropOrderById(activeChannel(), orderId);
+  }
+  if (lim.maxPrice && mySubmittedTotal() + cartTotalPrice() + (Number(it.price) || 0) > lim.maxPrice){
+    return "1인 최대 " + won(lim.maxPrice) + "까지만 주문할 수 있어요.";
+  }
+  return "";
+}
+function myOrderById(orderId){
+  var found = null;
+  (activeChannel().orders || []).forEach(function(o){ if (o.id === orderId) found = o; });
+  return found;
+}
+function changeMyOrderItemQty(orderId, itemIdx, delta){
+  var ch = activeChannel(), order = myOrderById(orderId);
+  if (!order || !Array.isArray(order.items)) return;
+  var it = order.items[itemIdx]; if (!it) return;
+  if (delta > 0){
+    var v = myOrderIncreaseViolation(it);
+    if (v){ toast(v); return; }
+  }
+  it.qty = (Number(it.qty) || 0) + delta;
+  if (it.qty <= 0) order.items.splice(itemIdx, 1);
+  if (!order.items.length) dropOrderById(ch, orderId);
+  else order.ts = Date.now();
   touch();
-  renderMenuArea(); renderCart();
-  toast("주문을 장바구니로 되돌렸어요. 고친 뒤 다시 제출해 주세요.");
-  var cc = $("cartCard");
-  if (cc) cc.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function removeMyOrderItem(orderId, itemIdx){
+  var ch = activeChannel(), order = myOrderById(orderId);
+  if (!order || !Array.isArray(order.items)) return;
+  var it = order.items[itemIdx]; if (!it) return;
+  var nm = it.name;
+  order.items.splice(itemIdx, 1);
+  if (!order.items.length) dropOrderById(ch, orderId);
+  else order.ts = Date.now();
+  touch();
+  toast("내 주문에서 ‘" + nm + "’" + josa(nm, "을", "를") + " 뺐어요.");
 }
 /* 내 주문인지 — 제출할 때 실린 주인 키(pkey)가 있으면 키로, 없으면(구버전) 이름으로 판단한다 */
 function isMineOrder(o){ return o.pkey ? (!!ui.myKey && o.pkey === ui.myKey) : (!!ui.myName && o.name === ui.myName); }
 function mySkipEntry(){ return ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? skipOf(ui.myName) : null); }
 
 /* 내 주문 카드 — 장바구니와 제출된 주문 사이에 둔다.
-   내가 주문했으면 내가 시킨 메뉴를 하나씩 한 줄로(왼쪽 이름·수량, 오른쪽 그 메뉴 금액)
-   보여 주고 아래에 합계를 두며, 여기서 바로
-   ‘삭제하고 장바구니에 다시 담기’로 내 주문을 취소할 수 있다.
+   내가 주문했으면 내가 시킨 메뉴를 하나씩 한 줄로 펼쳐 보여 주고 아래에 합계를 둔다.
+   각 줄에서 바로 메뉴별 수량을 −/+로 조절하거나(수량이 0이 되면 그 메뉴가 빠진다)
+   삭제 버튼으로 그 메뉴만 지울 수 있다 — 장바구니로 되돌렸다 다시 제출할 필요가 없다.
    Skip을 눌렀으면 ‘이름’ · Skip · 주문 안 함과 Skip 취소 버튼을 보여 준다 */
 function renderMyOrder(){
   var body = $("myOrderBody"); if (!body) return;
@@ -5807,27 +5806,45 @@ function renderMyOrder(){
   }
   var sum = 0;
   mineOrders.forEach(function(o){ sum += orderTotal(o); });
-  /* 메뉴를 하나씩 한 줄로 — 왼쪽은 메뉴 이름(사이즈·옵션 포함)과 수량,
-     오른쪽은 그 메뉴만의 금액(가격×수량). 예전처럼 쉼표로 한 줄에 몰지 않고
-     주문이 여러 건이어도 항목을 전부 펼쳐 보여 준다 */
+  /* 메뉴를 하나씩 한 줄로 — 왼쪽은 메뉴 이름(사이즈·옵션 포함)과 단가,
+     오른쪽은 수량 스테퍼·그 메뉴만의 금액(가격×수량)·삭제 버튼.
+     주문이 여러 건이어도 항목을 전부 펼쳐 보여 주고, 각 항목은
+     (주문 id, 항목 순서)로 구분해 그 자리에서 바로 고친다 */
+  var trashSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
   var itemRows = [];
   mineOrders.slice().reverse().forEach(function(o){
-    (o.items || []).forEach(function(it){
+    (o.items || []).forEach(function(it, idx){
       var suf = itemSuffix(it);
-      var label = esc(it.name) + (suf ? "(" + esc(suf) + ")" : "") + " ×" + it.qty;
-      var lineTotal = (Number(it.price) || 0) * (Number(it.qty) || 0);
+      var label = esc(it.name) + (suf ? "(" + esc(suf) + ")" : "");
+      var qty = Number(it.qty) || 0;
+      var lineTotal = (Number(it.price) || 0) * qty;
+      var ref = esc(o.id) + "|" + idx;
       itemRows.push('<div class="listrow myorder-item"><div class="main">'
-        + '<span class="who">' + label + "</span></div>"
-        + '<span class="amount">' + won(lineTotal) + "</span></div>");
+        + '<span class="who">' + label + '</span>'
+        + '<div class="detail">1개 ' + won(Number(it.price) || 0) + "</div></div>"
+        + '<span class="myorder-ctl">'
+        + '<span class="stepper"><button type="button" data-my-dec="' + ref + '" aria-label="' + esc(it.name) + ' 수량 줄이기">−</button>'
+        + '<span class="qv">' + qty + '</span>'
+        + '<button type="button" data-my-inc="' + ref + '" aria-label="' + esc(it.name) + ' 수량 늘리기">+</button></span>'
+        + '<span class="amount">' + won(lineTotal) + "</span>"
+        + '<button type="button" class="myorder-del" data-my-del="' + ref + '" aria-label="' + esc(it.name) + ' 삭제">' + trashSvg + "</button>"
+        + "</span></div>");
     });
   });
-  var restoreBtns = mineOrders.slice().reverse().map(function(o){
-    return '<button type="button" class="btn small primary" data-restoreorder="' + esc(o.id) + '">삭제하고 장바구니에 다시 담기</button>';
-  }).join("");
-  body.innerHTML = itemRows.join("") + '<div class="myorder-actions">' + restoreBtns + "</div>"
+  body.innerHTML = itemRows.join("")
     + '<div class="totalbar"><span class="t">합계</span><span class="v">' + won(sum) + "</span></div>";
-  Array.prototype.forEach.call(body.querySelectorAll("[data-restoreorder]"), function(b){
-    b.addEventListener("click", function(){ restoreOrderToCart(b.getAttribute("data-restoreorder")); });
+  function parseRef(b, attr){
+    var parts = String(b.getAttribute(attr) || "").split("|");
+    return { orderId: parts[0], idx: parseInt(parts[1], 10) };
+  }
+  Array.prototype.forEach.call(body.querySelectorAll("[data-my-inc]"), function(b){
+    b.addEventListener("click", function(){ var r = parseRef(b, "data-my-inc"); changeMyOrderItemQty(r.orderId, r.idx, 1); });
+  });
+  Array.prototype.forEach.call(body.querySelectorAll("[data-my-dec]"), function(b){
+    b.addEventListener("click", function(){ var r = parseRef(b, "data-my-dec"); changeMyOrderItemQty(r.orderId, r.idx, -1); });
+  });
+  Array.prototype.forEach.call(body.querySelectorAll("[data-my-del]"), function(b){
+    b.addEventListener("click", function(){ var r = parseRef(b, "data-my-del"); removeMyOrderItem(r.orderId, r.idx); });
   });
 }
 
