@@ -103,6 +103,8 @@
       .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
       .btn.green{background:var(--green);border-color:var(--green);color:#0C3524}
       @media (prefers-color-scheme: dark){ .btn.green{color:#0E241A} }
+      /* Skip 버튼 — 이름 칩의 ‘Skip’ 표시와 같은 회색(stat-skip 색)을 쓴다 */
+      .btn.skipgray{background:var(--stat-skip-bg);border-color:var(--stat-skip-line);color:var(--stat-skip-text)}
       .btn.ghost{background:transparent}
       .btn.danger{background:var(--danger-soft);border-color:transparent;color:var(--danger)}
       .btn.small{min-height:36px;padding:5px 12px;font-size:13px;border-radius:999px}
@@ -759,6 +761,12 @@
       .store-dd-row[aria-selected="true"]{background:var(--accent-soft)}
       .store-dd-row[aria-selected="true"] .check{background:var(--accent);border-color:var(--accent);color:#fff}
       .store-dd-empty{font-size:13.5px;color:var(--muted);padding:10px 12px}
+      /* 가게 드롭다운 안 검색 칸 — 목록 맨 위에 고정하고, 입력하면 맞는 가게만 남는다 (초성 검색 포함) */
+      .store-dd-search{padding:8px 8px 2px}
+      #view-channel .store-dd-search .field{height:40px;min-height:40px;border-radius:12px;padding-top:0;padding-bottom:0}
+      /* 가게 선택 바텀시트 안 검색 칸 — 시트 제목 아래에 두고 목록만 걸러 보여준다 */
+      .bsheet-search{margin:8px 0 2px}
+      .bsheet-search .field{min-height:42px;border-radius:12px}
 
     </style>
   </head>
@@ -801,7 +809,7 @@
               <div class="menu-tools">
                 <div id="menuSearchWrap">
                   <label class="flabel" for="menuSearch">메뉴 검색</label>
-                  <input class="field" id="menuSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
+                  <input class="field" id="menuSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="메뉴 이름·초성으로 검색 — 예: 밀크티, ㅁㅋㅌ" autocomplete="off" />
                 </div>
                 <div class="catchips" id="orderCatChips" role="group" aria-label="메뉴 카테고리"></div>
               </div>
@@ -873,7 +881,7 @@
                   <span class="sp-name placeholder" id="newOrderStoreName">가게를 고르세요</span>
                   <span class="sp-chev" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 </button>
-                <div class="store-dd-list hidden" id="newOrderStoreList"><div class="store-dd-scroll" id="newOrderStoreScroll" role="listbox" aria-label="가게 목록"></div></div>
+                <div class="store-dd-list hidden" id="newOrderStoreList"><div class="store-dd-search"><input class="field" id="newOrderStoreSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="가게 검색 — 예: 공차, ㄱㅊ" autocomplete="off" aria-label="가게 검색" /></div><div class="store-dd-scroll" id="newOrderStoreScroll" role="listbox" aria-label="가게 목록"></div></div>
               </div>
             </div>
             <div>
@@ -1233,7 +1241,7 @@
           </div>
           <div class="mt" id="manageMenuSearchWrap">
             <label class="flabel" for="manageMenuSearch">메뉴 검색</label>
-            <input class="field" id="manageMenuSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
+            <input class="field" id="manageMenuSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="메뉴 이름·초성으로 검색 — 예: 밀크티, ㅁㅋㅌ" autocomplete="off" />
             <p class="hint hidden" id="manageMenuSearchResult" role="status" aria-live="polite"></p>
           </div>
           <div id="manageMenuList" class="mt"></div>
@@ -1315,6 +1323,7 @@
         <div class="grab" aria-hidden="true"></div>
         <h3 id="storePickTitle">주문받을 가게 선택</h3>
         <p class="bsub">가게를 누른 뒤 ‘선택 완료’를 누르면 적용돼요.</p>
+        <div class="bsheet-search"><input class="field" id="storePickSearch" type="text" lang="ko" inputmode="text" enterkeyhint="search" placeholder="가게 검색 — 예: 공차, ㄱㅊ" autocomplete="off" aria-label="가게 검색" /></div>
         <div class="bsheet-list" id="storePickList" role="listbox" aria-label="가게 목록"></div>
         <div class="btnrow">
           <button class="btn primary" id="storePickDoneBtn" type="button">선택 완료</button>
@@ -2415,7 +2424,7 @@ var state = defaultState();
 var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", menuQuery:"", manageMenuQuery:"", menuCat:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1, catDel:null,
-           newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
+           newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newStoreQuery:"", newLimit:"",
            startSnap:null, startSnapFrozen:false, startSnapJson:"" };
 
 /* ---------- 팝업 뒤로 가기(History) 관리자 — 모든 팝업 공통 ----------
@@ -2777,6 +2786,39 @@ function isOrderMode(){
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 function won(n){ return Number(n||0).toLocaleString("ko-KR") + "원"; }
+/* ---------- 초성 검색 ----------
+   모든 필터 검색(가게 드롭다운·가게 선택 시트·메뉴 검색·채널 검색)이 함께 쓰는 판정 함수.
+   기본은 지금까지처럼 부분 일치(대소문자 무시)이고, 검색어에 한글 초성(ㄱ~ㅎ)이 들어 있으면
+   대상의 초성 문자열로도 비교한다 — ‘ㄱㅊ’ → 공차, ‘ㅅㅌㅂㅅ’ → 스타벅스.
+   완성형 글자가 섞인 검색어(‘공ㅊ’)는 완성형 글자를 그 글자의 초성으로 바꿔 초성끼리 비교한다 */
+var CHOSEONG_LIST = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+function choseongOf(str){
+  var out = "";
+  String(str == null ? "" : str).split("").forEach(function(ch){
+    var code = ch.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) out += CHOSEONG_LIST[Math.floor((code - 0xAC00) / 588)];
+    else out += ch.toLowerCase();
+  });
+  return out;
+}
+function isChoseongChar(ch){ return CHOSEONG_LIST.indexOf(ch) >= 0; }
+function searchMatches(text, rawQuery){
+  var q = String(rawQuery == null ? "" : rawQuery).trim().toLowerCase();
+  if (!q) return true;
+  var hay = String(text == null ? "" : text).toLowerCase();
+  if (hay.indexOf(q) >= 0) return true;
+  var hasCho = false;
+  for (var i = 0; i < q.length; i++){ if (isChoseongChar(q.charAt(i))){ hasCho = true; break; } }
+  if (!hasCho) return false;
+  /* 초성 비교는 공백을 빼고 한다 — ‘스타 벅스’처럼 띄어 써도, ‘ㅅㅌ ㅂㅅ’처럼 초성을 띄어 써도 걸린다 */
+  var choHay = choseongOf(hay).replace(/\s+/g, "");
+  var choQ = "";
+  q.split("").forEach(function(ch){
+    if (/\s/.test(ch)) return;
+    choQ += isChoseongChar(ch) ? ch : choseongOf(ch);
+  });
+  return !!choQ && choHay.indexOf(choQ) >= 0;
+}
 function toast(msg){
   var t = $("toast"); t.textContent = msg; t.classList.add("show");
   clearTimeout(toast._h); toast._h = setTimeout(function(){ t.classList.remove("show"); }, 2600);
@@ -4603,10 +4645,10 @@ function renderChannelCreateForm(){
     return '<div class="partblock"><h3>' + esc(blockTitle(b)) + ' <span class="gsum">' + b.members.length + '명</span></h3><div class="pgrid">' + b.members.map(function(n){ return '<span class="pchip">' + esc(n) + '</span>'; }).join("") + "</div></div>";
   }).join("") : '<div class="empty"><strong>파트를 골라 주세요</strong>인원이 여기에 나타납니다.</div>';
 }
-/* 채널 선택 콤보박스 — 칸에 입력한 글자가 들어간 채널만 걸러서 보여준다 */
+/* 채널 선택 콤보박스 — 칸에 입력한 글자가 들어간 채널만 걸러서 보여준다 (초성 검색 포함) */
 function channelComboItems(){
-  var q = (ui.channelQuery || "").trim().toLowerCase();
-  return ensureChannels().filter(function(c){ return !q || String(c.title || "검증1").toLowerCase().indexOf(q) >= 0; });
+  var q = (ui.channelQuery || "").trim();
+  return ensureChannels().filter(function(c){ return !q || searchMatches(c.title || "검증1", q); });
 }
 function renderChannelComboList(){
   var list = $("channelComboList"); if (!list) return;
@@ -4933,7 +4975,7 @@ function updateStoreDdFlip(){
   var dd = $("newOrderStoreDD"), btn = $("newOrderStoreBtn"), list = $("newOrderStoreList");
   if (!dd || !btn || !list || !_newStoreDdOpen) return;
   var rect = btn.getBoundingClientRect();
-  var needed = Math.min(list.offsetHeight || 264, 264) + 8;
+  var needed = Math.min(list.offsetHeight || 330, 330) + 8; /* 검색 칸 높이까지 포함한 패널 전체 높이 기준 */
   var spaceBelow = window.innerHeight - rect.bottom;
   var spaceAbove = rect.top;
   dd.classList.toggle("flip-up", spaceBelow < needed && spaceAbove > spaceBelow);
@@ -5082,12 +5124,19 @@ function renderOrderStart(){
     storeBtn.setAttribute("aria-expanded", _newStoreDdOpen ? "true" : "false");
     storeList.classList.toggle("hidden", !_newStoreDdOpen);
     if (!_newStoreDdOpen){ var ddEl = $("newOrderStoreDD"); if (ddEl) ddEl.classList.remove("flip-up"); }
+    /* 검색 칸 값 동기화 — 입력 중(포커스가 칸에 있을 때)은 건드리지 않아 타이핑이 끊기지 않게 한다.
+       검색 칸은 목록 껍데기 안에 있지만 스크롤 영역 밖에 있어, 목록만 다시 그려도 값·포커스가 유지된다 */
+    var storeSearchEl = $("newOrderStoreSearch");
+    if (storeSearchEl && document.activeElement !== storeSearchEl && storeSearchEl.value !== (ui.newStoreQuery || "")) storeSearchEl.value = ui.newStoreQuery || "";
+    var storeQuery = (ui.newStoreQuery || "").trim();
     var listHtml;
     if (!state.stores.length){
       listHtml = '<div class="store-dd-empty">등록된 가게가 없어요. ‘가게 관리’에서 먼저 추가해 주세요.</div>';
+    } else if (storeQuery && !state.stores.some(function(s){ return searchMatches(s.name || "", storeQuery); })){
+      listHtml = '<div class="store-dd-empty">‘' + esc(storeQuery) + '’ 검색 결과가 없어요.</div>';
     } else {
       listHtml = STORE_GROUPS.map(function(g){
-        var list = storesByGroup(g.key);
+        var list = storesByGroup(g.key).filter(function(s){ return !storeQuery || searchMatches(s.name || "", storeQuery); });
         if (!list.length) return "";
         return '<div class="store-dd-group">' + esc(g.label) + "</div>" + list.map(function(s){
           var on = ui.newStoreId === s.id;
@@ -5103,6 +5152,7 @@ function renderOrderStart(){
       Array.prototype.forEach.call(storeScroll.querySelectorAll("[data-store-id]"), function(b){
         b.addEventListener("click", function(){
           ui.newStoreId = b.getAttribute("data-store-id") || "";
+          ui.newStoreQuery = ""; /* 가게를 골랐으면 검색어는 비워 다음에 열 때 전체가 보이게 한다 */
           _newStoreDdOpen = false;
           renderOrderStart();
         });
@@ -5416,13 +5466,13 @@ function renderMenuArea(){
     });
   }
   /* 메뉴 목록은 필터가 걸려 있어도 내부 스크롤 상자 없이 페이지 전체 스크롤로 보인다 */
-  /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음).
+  /* 메뉴 검색: 입력한 단어를 포함하는 메뉴만 보여준다 (대소문자 구별 없음, 초성 검색 포함).
      검색 중에는 맞는 메뉴가 없는 카테고리는 통째로 숨겨진다 */
-  var query = (ui.menuQuery || "").trim().toLowerCase();
+  var query = (ui.menuQuery || "").trim();
   var menus = visMenus;
   if (ui.menuCat) menus = menus.filter(function(m){ return menuCat(m) === ui.menuCat; });
   if (query){
-    menus = menus.filter(function(m){ return String(m.name || "").toLowerCase().indexOf(query) >= 0; });
+    menus = menus.filter(function(m){ return searchMatches(m.name || "", query); });
     if (!menus.length){
       area.innerHTML = '<div class="empty"><strong>‘' + esc((ui.menuQuery || "").trim()) + '’ 검색 결과가 없어요</strong></div>';
       return;
@@ -5707,7 +5757,7 @@ function mySkipEntry(){ return ui.myKey ? skipOfKey(ui.myKey) : (ui.myName ? ski
    내가 주문했으면 내가 시킨 메뉴를 하나씩 한 줄로 펼쳐 보여 주고 아래에 합계를 둔다.
    각 줄에서 바로 메뉴별 수량을 −/+로 조절하거나(수량이 0이 되면 그 메뉴가 빠진다)
    삭제 버튼으로 그 메뉴만 지울 수 있다 — 장바구니로 되돌렸다 다시 제출할 필요가 없다.
-   주문이 있어도 합계 바 왼쪽에 초록 Skip 버튼을 그대로 둔다 — 누르면 주문이 취소되고 Skip으로 바뀐다.
+   주문이 있어도 합계 바 왼쪽에 회색 Skip 버튼을 그대로 둔다 — 누르면 주문이 취소되고 Skip으로 바뀐다.
    Skip을 눌렀으면 ‘이름’ · Skip · 주문 안 함과 Skip 취소 버튼을 보여 준다 */
 function renderMyOrder(){
   var body = $("myOrderBody"); if (!body) return;
@@ -5730,14 +5780,14 @@ function renderMyOrder(){
   }
   if (!ui.myName && !ui.myKey){
     body.innerHTML = '<div class="empty"><strong>이름을 선택하면 내 주문이 보여요</strong>메뉴에서 +를 누르면 바로 주문돼요.</div>'
-      + '<div class="btnrow mt"><button type="button" class="btn green" id="skipBtn" style="flex:1 1 auto">Skip · 주문 안 함</button></div>';
+      + '<div class="btnrow mt"><button type="button" class="btn skipgray" id="skipBtn" style="flex:1 1 auto">Skip · 주문 안 함</button></div>';
     bindSkipBtn();
     return;
   }
   var mineOrders = activeChannel().orders.filter(function(o){ return isMineOrder(o); });
   if (!mineOrders.length){
     body.innerHTML = '<div class="empty"><strong>아직 주문한 메뉴가 없어요</strong>메뉴에서 +를 누르면 바로 주문돼요.</div>'
-      + '<div class="btnrow mt"><button type="button" class="btn green" id="skipBtn" style="flex:1 1 auto">Skip · 주문 안 함</button></div>';
+      + '<div class="btnrow mt"><button type="button" class="btn skipgray" id="skipBtn" style="flex:1 1 auto">Skip · 주문 안 함</button></div>';
     bindSkipBtn();
     return;
   }
@@ -5771,7 +5821,7 @@ function renderMyOrder(){
     });
   });
   body.innerHTML = itemRows.join("")
-    + '<div class="totalbar"><button type="button" class="btn green" id="skipBtn">Skip</button>'
+    + '<div class="totalbar"><button type="button" class="btn skipgray" id="skipBtn">Skip</button>'
     + '<span class="myorder-total"><span class="t">합계</span><span class="v">' + won(sum) + "</span></span></div>";
   bindSkipBtn();
   function parseRef(b, attr){
@@ -6411,6 +6461,7 @@ function closeChannelModal(discard, fromPop){
    채널 팝업의 ‘주문받을 가게’ 버튼을 누르면 아래에서 올라온다. 시트 안에서 고른 가게는
    storePickSel에 임시로 담아 두고, ‘선택 완료’를 누르거나 배경을 눌러 닫을 때 draft에 적용한다 */
 var storePickSel = "";
+var storePickQuery = ""; /* 가게 선택 시트 검색어 (이 시트 전용 세션 상태, 초성 검색 포함) */
 function storePickRowHtml(id, name, meta){
   var on = (storePickSel || "") === (id || "");
   return '<button type="button" class="bsheet-row" role="option" data-pick-store="' + esc(id || "") + '" aria-selected="' + on + '">'
@@ -6420,16 +6471,21 @@ function storePickRowHtml(id, name, meta){
 }
 function renderStorePickList(){
   var list = $("storePickList"); if (!list) return;
-  var html = storePickRowHtml("", "가게를 고르지 않음", "주문받을 가게를 비워 둬요");
+  var q = (storePickQuery || "").trim();
+  /* 검색 중에는 ‘고르지 않음’ 행을 빼고, 맞는 가게가 있는 그룹만 보여준다 */
+  var html = q ? "" : storePickRowHtml("", "가게를 고르지 않음", "주문받을 가게를 비워 둬요");
   /* 가게 관리와 같은 순서(사내 / 팝업스토어 / 사외)의 섹션으로 나눠 보여준다.
-     가게가 없는 그룹도 섹션 제목과 빈 안내가 보이게 한다 */
+     가게가 없는 그룹도 섹션 제목과 빈 안내가 보이게 한다 (검색 중에는 맞는 그룹만) */
   html += STORE_GROUPS.map(function(g){
-    var stores = storesByGroup(g.key);
+    var stores = storesByGroup(g.key).filter(function(s){ return !q || searchMatches(s.name || "", q); });
+    if (q && !stores.length) return "";
     var rows = stores.length ? stores.map(function(s){
       return storePickRowHtml(s.id, s.name, "메뉴 " + (s.menus ? s.menus.length : 0) + "개");
     }).join("") : '<div class="bsheet-empty">' + esc(g.label) + " 가게가 아직 없어요</div>";
     return '<div class="bsheet-group">' + esc(g.label) + "</div>" + rows;
   }).join("");
+  if (q && !state.stores.some(function(s){ return searchMatches(s.name || "", q); }))
+    html = '<div class="bsheet-empty">‘' + esc(q) + '’ 검색 결과가 없어요.</div>';
   list.innerHTML = html;
   Array.prototype.forEach.call(list.querySelectorAll("[data-pick-store]"), function(b){
     b.addEventListener("click", function(){
@@ -6441,6 +6497,8 @@ function renderStorePickList(){
 function openStorePick(){
   var modal = $("storePickModal"); if (!modal) return;
   storePickSel = ensureDraft().storeId || "";
+  storePickQuery = ""; /* 열 때마다 검색어는 비워 전체 가게가 보이게 한다 */
+  var spq = $("storePickSearch"); if (spq) spq.value = "";
   renderStorePickList();
   modal.classList.remove("hidden");
   _trackModalOpen("storePickModal");
@@ -6900,13 +6958,12 @@ function refreshStoreCounts(){
   });
   /* 메뉴 검색 중에는 그룹 헤더 개수를 전체가 아니라 검색 결과 개수로 유지한다 —
      refreshStoreCounts가 불려도 검색으로 좁혀진 목록의 숫자가 전체로 되돌아가지 않게 한다 */
-  var _mq = (ui.manageMenuQuery || "").trim().toLowerCase();
+  var _mq = (ui.manageMenuQuery || "").trim();
   function groupCnt(c){
     if (!_mq) return catCnt(c);
     return (ms.menus || []).filter(function(m){
       if (menuCat(m) !== c) return false;
-      var hay = ((m.name || "") + " " + menuCat(m)).toLowerCase();
-      return hay.indexOf(_mq) >= 0;
+      return searchMatches((m.name || "") + " " + menuCat(m), _mq);
     }).length;
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-group-count]"), function(el){
@@ -7153,14 +7210,13 @@ function renderManageMenus(){
   var resultHint = $("manageMenuSearchResult");
   if (!s){ el.innerHTML = '<div class="empty"><strong>가게가 없어요</strong>먼저 가게를 추가하세요.</div>'; if (resultHint) resultHint.classList.add("hidden"); return; }
   if (!s.menus || !s.menus.length){ el.innerHTML = '<div class="empty"><strong>‘' + esc(s.name) + '’ 메뉴가 없어요</strong>아래 ‘새 메뉴 추가’ 버튼을 눌러 팝업에서 첫 메뉴를 추가하세요.</div>'; if (resultHint) resultHint.classList.add("hidden"); return; }
-  /* 메뉴 검색 — 이름(과 카테고리)에 검색어가 든 메뉴만 남긴다. 검색 칸은 #manageMenuList 밖에 있어
+  /* 메뉴 검색 — 이름(과 카테고리)에 검색어가 든 메뉴만 남긴다 (초성 검색 포함). 검색 칸은 #manageMenuList 밖에 있어
      다시 그려도 입력값·포커스가 유지된다 (주문 화면 메뉴 검색과 같은 방식) */
-  var query = (ui.manageMenuQuery || "").trim().toLowerCase();
+  var query = (ui.manageMenuQuery || "").trim();
   var visibleMenus = s.menus;
   if (query){
     visibleMenus = s.menus.filter(function(m){
-      var hay = ((m.name || "") + " " + menuCat(m)).toLowerCase();
-      return hay.indexOf(query) >= 0;
+      return searchMatches((m.name || "") + " " + menuCat(m), query);
     });
   }
   if (resultHint){
@@ -7563,24 +7619,32 @@ function addCustomNameFromInput(groupName){
   if (dup.length) toast("‘" + dup.join("’, ‘") + "’님은 추가 인원에 이미 있어 건너뛰었어요.");
   var ni = extraInputFor(g); if (ni) focusFieldKo(ni);
 }
-/* 가게 선택 커스텀 드롭다운 — 버튼으로 열고 닫고, 바깥을 누르거나 Esc를 누르면 닫힌다 */
+/* 가게 선택 커스텀 드롭다운 — 버튼으로 열고 닫고, 바깥을 누르거나 Esc를 누르면 닫힌다.
+   닫을 때는 검색어를 비워 다음에 열면 전체 가게가 보이게 한다 */
 var _newStoreBtn = $("newOrderStoreBtn");
 if (_newStoreBtn) _newStoreBtn.addEventListener("click", function(){
   _newStoreDdOpen = !_newStoreDdOpen;
+  if (!_newStoreDdOpen) ui.newStoreQuery = "";
   renderOrderStart();
+  /* 넓은 화면(PC)에서 열면 바로 검색 칸에 포커스를 둬 타이핑으로 걸러 고를 수 있게 한다.
+     모바일에서는 키보드가 갑자기 올라오지 않게 포커스를 두지 않는다 */
+  if (_newStoreDdOpen && window.innerWidth >= 1024){ var _nss = $("newOrderStoreSearch"); if (_nss) focusFieldKo(_nss); }
 });
+/* 가게 드롭다운 검색 입력 — 목록(#newOrderStoreScroll) 밖에 있어 다시 그려도 입력값·포커스가 유지된다 (초성 검색 포함) */
+var _newStoreSearchEl = $("newOrderStoreSearch");
+if (_newStoreSearchEl) _newStoreSearchEl.addEventListener("input", function(){ ui.newStoreQuery = _newStoreSearchEl.value; renderOrderStart(); });
 /* 드롭다운이 열린 채로 창 높이가 바뀌거나 화면이 스크롤되면 위/아래 방향을 다시 계산한다 (A안·스마트 플립) */
 window.addEventListener("resize", function(){ if (_newStoreDdOpen) updateStoreDdFlip(); });
 window.addEventListener("scroll", function(){ if (_newStoreDdOpen) updateStoreDdFlip(); }, { passive:true });
 document.addEventListener("click", function(e){
   if (!_newStoreDdOpen) return;
   var dd = $("newOrderStoreDD");
-  if (dd && !dd.contains(e.target)){ _newStoreDdOpen = false; renderOrderStart(); }
+  if (dd && !dd.contains(e.target)){ _newStoreDdOpen = false; ui.newStoreQuery = ""; renderOrderStart(); }
 });
 var _newStoreDD = $("newOrderStoreDD");
 if (_newStoreDD) _newStoreDD.addEventListener("keydown", function(e){
   if (e.key === "Escape" && _newStoreDdOpen){
-    _newStoreDdOpen = false; renderOrderStart();
+    _newStoreDdOpen = false; ui.newStoreQuery = ""; renderOrderStart();
     var b = $("newOrderStoreBtn"); if (b) b.focus();
   }
 });
@@ -7599,6 +7663,9 @@ var _pmBack = $("partsModalBackdrop"); if (_pmBack) _pmBack.addEventListener("cl
 $("setupTitle").addEventListener("input", function(){ ensureDraft().title = $("setupTitle").value; ui.draftDirty = true; });
 /* ‘주문받을 가게’ 버튼 → 바텀시트 열기. ‘선택 완료’·배경 클릭 모두 닫으면서 선택을 적용한다 */
 $("setupStoreBtn").addEventListener("click", function(){ openStorePick(); });
+/* 가게 선택 시트 검색 입력 — 검색 칸은 목록(#storePickList) 밖에 있어 다시 그려도 입력값·포커스가 유지된다 */
+var _storePickSearchEl = $("storePickSearch");
+if (_storePickSearchEl) _storePickSearchEl.addEventListener("input", function(){ storePickQuery = _storePickSearchEl.value; renderStorePickList(); });
 $("storePickDoneBtn").addEventListener("click", function(){ applyStorePick(); });
 $("storePickBackdrop").addEventListener("click", function(){ applyStorePick(); });
 /* 개별 인원 추가 — 목록에 없는 이름을 직접 입력해 넣는다 */
