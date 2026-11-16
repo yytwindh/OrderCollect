@@ -1168,6 +1168,11 @@
             <div id="catPresetRow" style="margin-top:8px"></div>
             <p class="hint">이름을 바꾸면 속한 메뉴도 함께 바뀝니다.<br />채널에서 카테고리별 수량 제한을 걸 수 있어요.</p>
           </div>
+          <div class="mt" id="manageMenuSearchWrap">
+            <label class="flabel" for="manageMenuSearch">메뉴 검색 — 편집할 메뉴를 바로 찾기</label>
+            <input class="field" id="manageMenuSearch" type="search" lang="ko" inputmode="search" enterkeyhint="search" placeholder="메뉴 이름으로 검색 — 예: 밀크티" autocomplete="off" />
+            <p class="hint hidden" id="manageMenuSearchResult" role="status" aria-live="polite"></p>
+          </div>
           <div id="manageMenuList" class="mt"></div>
           <div class="btnrow mt">
             <button class="btn primary" id="openNewMenuBtn" type="button">+ 새 메뉴 추가</button>
@@ -2342,7 +2347,7 @@ function defaultState(){
 }
 var state = defaultState();
 /* session-only UI state (not shared) */
-var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", menuCat:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
+var ui = { tab:"channel", channelId:"", urlChannelId:"", editChannelId:null, lastLinkChannelId:"", delArmChannel:"", myName:"", myPart:"", myKey:"", cart:{}, carts:{}, cartChannelId:"", cartStoreId:null, menuQuery:"", manageMenuQuery:"", menuCat:"", ordersTab:"bymenu", tempSel:{}, manageStoreId:null, editStoreId:null, editMenuId:null,
            draft:null, draftDirty:false, roomCode:"", editCat:null, renameTarget:null, memberAdd:null, partAdd:null, groupAdd:null, cardChannelId:"", cardMode:"view", inlineDraft:null,
            channelQuery:"", comboOpen:false, comboActive:-1,
            newSel:[], newCustom:[], newCustomByGroup:{}, newCustomSel:[], newStoreId:"", newLimit:"",
@@ -6909,8 +6914,19 @@ function refreshStoreCounts(){
   Array.prototype.forEach.call(document.querySelectorAll("[data-cat-count]"), function(el){
     el.textContent = "메뉴 " + catCnt(el.getAttribute("data-cat-count")) + "개";
   });
+  /* 메뉴 검색 중에는 그룹 헤더 개수를 전체가 아니라 검색 결과 개수로 유지한다 —
+     refreshStoreCounts가 불려도 검색으로 좁혀진 목록의 숫자가 전체로 되돌아가지 않게 한다 */
+  var _mq = (ui.manageMenuQuery || "").trim().toLowerCase();
+  function groupCnt(c){
+    if (!_mq) return catCnt(c);
+    return (ms.menus || []).filter(function(m){
+      if (menuCat(m) !== c) return false;
+      var hay = ((m.name || "") + " " + menuCat(m)).toLowerCase();
+      return hay.indexOf(_mq) >= 0;
+    }).length;
+  }
   Array.prototype.forEach.call(document.querySelectorAll("[data-group-count]"), function(el){
-    el.textContent = "메뉴 " + catCnt(el.getAttribute("data-group-count")) + "개";
+    el.textContent = "메뉴 " + groupCnt(el.getAttribute("data-group-count")) + "개";
   });
 }
 
@@ -7070,8 +7086,32 @@ function startMenuInCategory(cat){
 }
 function renderManageMenus(){
   var el = $("manageMenuList"), s = ui.manageStoreId ? storeById(ui.manageStoreId) : null;
-  if (!s){ el.innerHTML = '<div class="empty"><strong>가게가 없어요</strong>먼저 가게를 추가하세요.</div>'; return; }
-  if (!s.menus || !s.menus.length){ el.innerHTML = '<div class="empty"><strong>‘' + esc(s.name) + '’ 메뉴가 없어요</strong>아래 ‘새 메뉴 추가’ 버튼을 눌러 팝업에서 첫 메뉴를 추가하세요.</div>'; return; }
+  var resultHint = $("manageMenuSearchResult");
+  if (!s){ el.innerHTML = '<div class="empty"><strong>가게가 없어요</strong>먼저 가게를 추가하세요.</div>'; if (resultHint) resultHint.classList.add("hidden"); return; }
+  if (!s.menus || !s.menus.length){ el.innerHTML = '<div class="empty"><strong>‘' + esc(s.name) + '’ 메뉴가 없어요</strong>아래 ‘새 메뉴 추가’ 버튼을 눌러 팝업에서 첫 메뉴를 추가하세요.</div>'; if (resultHint) resultHint.classList.add("hidden"); return; }
+  /* 메뉴 검색 — 이름(과 카테고리)에 검색어가 든 메뉴만 남긴다. 검색 칸은 #manageMenuList 밖에 있어
+     다시 그려도 입력값·포커스가 유지된다 (주문 화면 메뉴 검색과 같은 방식) */
+  var query = (ui.manageMenuQuery || "").trim().toLowerCase();
+  var visibleMenus = s.menus;
+  if (query){
+    visibleMenus = s.menus.filter(function(m){
+      var hay = ((m.name || "") + " " + menuCat(m)).toLowerCase();
+      return hay.indexOf(query) >= 0;
+    });
+  }
+  if (resultHint){
+    if (query){
+      resultHint.textContent = "‘" + (ui.manageMenuQuery || "").trim() + "’ 검색 결과 " + visibleMenus.length + "개 · 전체 " + s.menus.length + "개";
+      resultHint.classList.remove("hidden");
+    } else {
+      resultHint.textContent = "";
+      resultHint.classList.add("hidden");
+    }
+  }
+  if (query && !visibleMenus.length){
+    el.innerHTML = '<div class="empty"><strong>검색 결과가 없어요</strong>‘' + esc((ui.manageMenuQuery || "").trim()) + '’에 맞는 메뉴가 없어요. 검색어를 바꿔 보세요.</div>';
+    return;
+  }
   function menuRow(m){
     var sd = isGongchaStore(s) ? menuSweetDefault(m) : null;
     return '<div class="listrow"><div class="main"><span class="who">' + esc(m.name) + '</span> <span class="catbadge">' + esc(menuCat(m)) + '</span> <span class="tempbadge">' + tempTypeText(m.tempType) + '</span>'
@@ -7080,9 +7120,10 @@ function renderManageMenus(){
       + '<span class="btnrow"><button type="button" class="btn small" data-editmenu="' + esc(m.id) + '">편집</button>'
       + '<button type="button" class="btn small danger" data-delmenu="' + esc(m.id) + '">삭제</button></span></div>';
   }
-  /* 저장된 메뉴를 카테고리별로 묶어서 보여준다 — 순서는 가게 카테고리 순서를 따른다 */
+  /* 저장된 메뉴를 카테고리별로 묶어서 보여준다 — 순서는 가게 카테고리 순서를 따른다.
+     검색 중이면 visibleMenus(검색 결과)만 묶어, 맞는 카테고리만 남는다 */
   var byCat = {}, appear = [];
-  s.menus.forEach(function(m){ var c = menuCat(m); if (!byCat[c]){ byCat[c] = []; appear.push(c); } byCat[c].push(m); });
+  visibleMenus.forEach(function(m){ var c = menuCat(m); if (!byCat[c]){ byCat[c] = []; appear.push(c); } byCat[c].push(m); });
   var pref = storeCategories(s);
   var order = pref.filter(function(c){ return !!byCat[c]; }).concat(appear.filter(function(c){ return pref.indexOf(c) < 0; }));
   el.innerHTML = order.map(function(c){
@@ -7623,6 +7664,9 @@ $("cartClearBtn").addEventListener("click", function(){ ui.cart = {}; renderMenu
 /* 메뉴 검색 입력 — 검색 칸은 메뉴 목록(#menuArea) 밖에 있어 다시 그려도 입력값과 포커스가 유지된다 */
 var _menuSearchEl = $("menuSearch");
 if (_menuSearchEl) _menuSearchEl.addEventListener("input", function(){ ui.menuQuery = _menuSearchEl.value; renderMenuArea(); });
+/* 가게 관리 메뉴 검색 입력 — 검색 칸은 편집 목록(#manageMenuList) 밖에 있어 다시 그려도 입력값·포커스가 유지된다 */
+var _manageMenuSearchEl = $("manageMenuSearch");
+if (_manageMenuSearchEl) _manageMenuSearchEl.addEventListener("input", function(){ ui.manageMenuQuery = _manageMenuSearchEl.value; renderManageMenus(); });
 /* 화면 너비가 바뀌면 글자 줄바꿈이 달라져 행 높이 기준도 달라진다 —
    그때만 전체 메뉴 기준으로 기준 높이를 새로 재도록 목록을 다시 그린다.
    카테고리·검색 변경은 너비를 바꾸지 않으므로 이 경로를 타지 않는다 */
@@ -7639,7 +7683,8 @@ if (_mcbBtn) _mcbBtn.addEventListener("click", function(){ var cc = $("cartCard"
 
 /* store form — 가게 추가·편집 + 카테고리·메뉴 통합 팝업 (채널 설정 팝업과 같은 방식) */
 function resetStoreForm(){
-  ui.editStoreId = null; $("storeName").value = ""; $("storeDesc").value = "";
+  ui.editStoreId = null; ui.manageMenuQuery = ""; var _mms = $("manageMenuSearch"); if (_mms) _mms.value = "";
+  $("storeName").value = ""; $("storeDesc").value = "";
   var gs = $("storeGroup"); if (gs){ gs.value = "popup"; gs.disabled = false; } /* 새 가게의 그룹 기본값은 팝업스토어 */
   var gh = $("storeGroupHint"); if (gh) gh.classList.add("hidden");
   $("storeFormTitle").textContent = "새 가게 추가"; $("storeSaveBtn").textContent = "가게 추가";
@@ -7649,6 +7694,8 @@ function resetStoreForm(){
 /* 가게 하나를 통합 팝업으로 연다 — 가게 정보·카테고리·메뉴가 한 팝업에 함께 보인다 */
 function openStoreEditor(s){
   if (!s) return;
+  /* 다른 가게를 열면 이전 가게에서 쓰던 메뉴 검색어는 비운다 — 새 가게 목록이 검색으로 가려진 채 열리지 않게 */
+  if (ui.manageStoreId !== s.id){ ui.manageMenuQuery = ""; var _mms2 = $("manageMenuSearch"); if (_mms2) _mms2.value = ""; }
   ui.editStoreId = s.id; ui.manageStoreId = s.id;
   $("storeName").value = s.name; $("storeDesc").value = s.desc || "";
   /* 그룹은 편집에서 바꿀 수 있다. 단, 기본 가게 5곳은 사내로 고정이라 선택을 잠근다 */
