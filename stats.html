@@ -64,6 +64,12 @@ h2.card-title{font-size:17px;margin:0 0 14px;color:#132a26}
 .recent-store{font-weight:700;font-size:15px}
 .recent-count{font-size:13px;color:#647a74;white-space:nowrap}
 .recent-members{font-size:13px;color:#3d554f;line-height:1.6;margin-top:4px;word-break:keep-all}
+.store-bar-cell{min-width:140px;text-align:left!important}
+.store-bar-track{background:#e6f2ee;border-radius:999px;height:14px;overflow:hidden;min-width:110px}
+.store-bar-fill{background:linear-gradient(90deg,#14B8A6,#0F766E);height:100%;border-radius:999px;min-width:4px}
+td.store-name,th.store-name{text-align:left;font-weight:700}
+.monthly-store-wrap{overflow-x:auto;margin-top:6px}
+.monthly-store-wrap td.zero{color:#9db8b1}
 </style>
 </head>
 <body>
@@ -113,6 +119,28 @@ h2.card-title{font-size:17px;margin:0 0 14px;color:#132a26}
       <div id="recentList"></div>
       <div class="empty hidden" id="recentEmpty">조건을 통과한 주문 채널이 없습니다.</div>
       <p class="legend">인원 이름은 제출 시점에 선택돼 있던 인원 목록(members)입니다. 이 목록은 개발자 전용인 이 페이지에서만 표시합니다.</p>
+    </div>
+
+    <div class="section-head"><h2>🏪 가게별 주문</h2><span>절반 초과 필터 통과 채널만 · 취합 페이지 기준</span></div>
+    <div class="card">
+      <h2 class="card-title">가게별 취합 페이지 수</h2>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>순위</th><th class="store-name">가게</th><th>취합 페이지 수</th><th>주문 인원 수</th><th style="text-align:left">취합 페이지 수 비율</th></tr></thead>
+        <tbody id="storeBody"></tbody>
+      </table>
+      </div>
+      <div class="empty hidden" id="storeEmpty">조건을 통과한 주문 채널이 없습니다.</div>
+      <p class="legend">취합 페이지 수 = 그 가게를 선택한 완료된 채널 수입니다. 방별 가게는 가장 최근 <b>order_submitted</b> 문서의 <b>store</b> 값 기준이며, 주문 인원 수는 그 가게 채널들의 order_submitted 문서 수 합계(최종 주문을 낸 사람 수)입니다. 테스트성 채널(절반 초과 필터 제외)은 포함하지 않습니다.</p>
+      <h2 class="card-title" style="margin-top:22px">월별 가게별 취합 페이지 수</h2>
+      <div class="monthly-store-wrap">
+      <table>
+        <thead id="monthlyStoreHead"></thead>
+        <tbody id="monthlyStoreBody"></tbody>
+      </table>
+      </div>
+      <div class="empty hidden" id="monthlyStoreEmpty">표시할 데이터가 없습니다.</div>
+      <p class="legend">월은 채널의 가장 최근 주문 제출 시점(YYYY-MM) 기준입니다. 가게 열은 전체 취합 페이지 수 상위 5개만 표시하고, 나머지는 ‘기타’로 묶었습니다.</p>
     </div>
 
     <div class="section-head"><h2>🗓️ 월별 통계</h2><span>전체 기간 · 오래된 달부터</span></div>
@@ -224,7 +252,7 @@ async function loadStats(){
   }
   ALL_LOADED=true;
   computeRoomFilter();
-  renderFilterNote();renderCumulative();renderMonthly();renderGrowth();renderDaily();renderRecent();
+  renderFilterNote();renderCumulative();renderMonthly();renderGrowth();renderDaily();renderRecent();renderStoreStats();
   var datesAll=ALL_EVENTS.map(function(e){return e.ds;}).sort();
   var rangeTxt=datesAll.length?(datesAll[0]+" ~ "+datesAll[datesAll.length-1]):"데이터 없음";
   status.textContent="전체 "+rangeTxt+" · 이벤트 "+fmt(ALL_EVENTS.length)+"건 (최대 5,000건 조회)";
@@ -247,6 +275,41 @@ function renderRecent(){
     var names=(g.members&&g.members.length)?g.members.map(function(n){return esc(n);}).join(", "):"-";
     return '<div class="recent-item"><div class="recent-top"><span class="recent-when">'+esc(fmtDateTime(g.latestDt))+'</span><span class="recent-store">'+esc(g.store||"(가게 미기록)")+'</span><span class="recent-count">제출 '+fmt(g.count)+" / 전체 "+fmt(total)+"명</span></div>"
       +'<div class="recent-members">'+names+"</div></div>";
+  }).join("");
+}
+function renderStoreStats(){
+  var storeMap={},monthMap={};
+  Object.keys(ROOM_GROUPS).forEach(function(k){
+    var g=ROOM_GROUPS[k];
+    if(!PASSED_ROOMS.has(g.room))return;
+    var store=g.store||"(가게 미기록)";
+    if(!storeMap[store])storeMap[store]={store:store,rooms:0,orders:0};
+    storeMap[store].rooms++;storeMap[store].orders+=(g.count||0);
+    var mo=g.latestDt?kstDateStr(g.latestDt).slice(0,7):"날짜 미상";
+    if(!monthMap[mo])monthMap[mo]={total:0,byStore:{}};
+    monthMap[mo].total++;monthMap[mo].byStore[store]=(monthMap[mo].byStore[store]||0)+1;
+  });
+  var stores=Object.keys(storeMap).map(function(k){return storeMap[k];});
+  stores.sort(function(a,b){return (b.rooms-a.rooms)||(b.orders-a.orders)||(a.store<b.store?-1:(a.store>b.store?1:0));});
+  var maxRooms=0;stores.forEach(function(s){maxRooms=Math.max(maxRooms,s.rooms);});
+  document.getElementById("storeEmpty").classList.toggle("hidden",stores.length>0);
+  document.getElementById("storeBody").innerHTML=stores.map(function(s,i){
+    var pct=maxRooms>0?Math.round(s.rooms/maxRooms*100):0;
+    return "<tr><td>"+(i+1)+'</td><td class="store-name">'+esc(s.store)+"</td><td><b>"+fmt(s.rooms)+"</b></td><td>"+fmt(s.orders)+'</td><td class="store-bar-cell"><div class="store-bar-track"><div class="store-bar-fill" style="width:'+pct+'%"></div></div></td></tr>';
+  }).join("");
+  var top5=stores.slice(0,5).map(function(s){return s.store;});
+  var hasOther=stores.length>5;
+  var months=Object.keys(monthMap).sort(function(a,b){
+    if(a==="날짜 미상")return 1;if(b==="날짜 미상")return -1;return a<b?-1:(a>b?1:0);
+  });
+  document.getElementById("monthlyStoreEmpty").classList.toggle("hidden",months.length>0);
+  var head="<tr><th>월</th>"+top5.map(function(n){return "<th>"+esc(n)+"</th>";}).join("")+(hasOther?"<th>기타</th>":"")+"<th>합계</th></tr>";
+  document.getElementById("monthlyStoreHead").innerHTML=head;
+  document.getElementById("monthlyStoreBody").innerHTML=months.map(function(mo){
+    var m=monthMap[mo],sumTop=0,cells="";
+    top5.forEach(function(n){var v=m.byStore[n]||0;sumTop+=v;cells+='<td'+(v===0?' class="zero"':"")+">"+fmt(v)+"</td>";});
+    var other=m.total-sumTop;
+    return "<tr><td><b>"+esc(mo)+"</b></td>"+cells+(hasOther?'<td'+(other===0?' class="zero"':"")+">"+fmt(other)+"</td>":"")+"<td><b>"+fmt(m.total)+"</b></td></tr>";
   }).join("");
 }
 function renderCumulative(){
