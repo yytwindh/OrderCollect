@@ -86,7 +86,7 @@ td.store-name,th.store-name{text-align:left;font-weight:700}
 
   <div id="statsView" class="hidden">
     <h1><span class="brand">Morder</span> 통계</h1>
-    <p class="sub">익명 기기 ID 기준 집계입니다. 접속 통계는 이름 없이 집계하고, 선택 인원 이름은 아래 ‘최근 제출된 주문’ 목록에만 표시합니다.<br>누적·월별 통계는 전체 기간 기준이며, 일별 표만 아래 기간 선택의 영향을 받습니다.</p>
+    <p class="sub">익명 기기 ID 기준 집계입니다. 접속 통계는 이름 없이 집계하고, 선택 인원 이름은 아래 ‘최근 제출된 주문’ 목록에만 표시합니다.<br>통계는 <b>2026-11-17부터</b> 관리합니다. 2026-11-17 이전 기록은 테스트로 보고 모든 집계에서 제외합니다.<br>누적·월별 통계는 2026-11-17부터의 전체 기간 기준이며, 일별 표만 아래 기간 선택의 영향을 받습니다.</p>
     <div class="toolbar">
       <label for="periodSel">일별 기간</label>
       <select id="periodSel" aria-label="기간 선택">
@@ -100,7 +100,7 @@ td.store-name,th.store-name{text-align:left;font-weight:700}
     </div>
     <p class="filter-note hidden" id="filterNote"></p>
 
-    <div class="section-head"><h2>📊 누적 통계</h2><span>전체 기간 · 기간 선택과 무관</span></div>
+    <div class="section-head"><h2>📊 누적 통계</h2><span>2026-11-17부터 · 기간 선택과 무관</span></div>
     <div class="cards" id="cumulativeCards"></div>
     <p class="legend" style="margin:4px 2px 0">주문 제출 수는 최종 주문 기준입니다 — <b>order_submitted</b> 문서가 사람당 채널당 1개라 문서 수가 곧 최종 주문을 낸 사람 수입니다. 취합 창 생성·주문 제출·Skip 집계에는 절반 초과 필터가 적용됩니다(제출 인원이 전체 인원의 절반을 초과한 채널만). 접속 기기 수(페이지뷰)는 필터 없이 집계합니다.</p>
 
@@ -143,7 +143,7 @@ td.store-name,th.store-name{text-align:left;font-weight:700}
       <p class="legend">월은 채널의 가장 최근 주문 제출 시점(YYYY-MM) 기준입니다. 가게 열은 전체 취합 페이지 수 상위 5개만 표시하고, 나머지는 ‘기타’로 묶었습니다.</p>
     </div>
 
-    <div class="section-head"><h2>🗓️ 월별 통계</h2><span>전체 기간 · 오래된 달부터</span></div>
+    <div class="section-head"><h2>🗓️ 월별 통계</h2><span>2026-11-17부터 · 오래된 달부터</span></div>
     <div class="card">
       <h2 class="card-title">월별 집계</h2>
       <div style="overflow-x:auto">
@@ -183,6 +183,8 @@ td.store-name,th.store-name{text-align:left;font-weight:700}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
+var STATS_START_DS = "2026-11-17"; // 통계 관리 시작일(KST, 이 날짜 포함). 이전 기록은 테스트로 보고 제외
+var EXCLUDED_PRE_CUTOFF = 0; // 시작일 이전이라 제외된 이벤트 수
 var EXPECTED_HASH = "284fbb3a84e7c3b3460402c4912ed5c8f3535a0627b623fda14f355ab454244e";
 var UNLOCK_KEY = "morder_stats_unlocked";
 firebase.initializeApp({
@@ -212,6 +214,7 @@ function fmtDateTime(dt){if(!dt)return "-";var p=new Intl.DateTimeFormat("en-CA"
 function computeRoomFilter(){
   ROOM_GROUPS={};PASSED_ROOMS=new Set();EXCLUDED_ROOMS=0;
   ALL_EVENTS.forEach(function(e){
+    if(e.ds&&e.ds<STATS_START_DS)return;
     if(e.type!=="order_submitted")return;
     var key=e.room||"";
     if(!ROOM_GROUPS[key])ROOM_GROUPS[key]={room:key,count:0,total:0,latestDt:null,store:"",members:[]};
@@ -227,6 +230,7 @@ function computeRoomFilter(){
 }
 /* 주문 관련 집계에 이 이벤트를 셀지 — 페이지뷰(방문)는 필터 없음, 나머지는 방이 통과해야 함 */
 function isCounted(e){
+  if(e.ds&&e.ds<STATS_START_DS)return false;
   if(e.type==="pageview")return true;
   return PASSED_ROOMS.has(e.room||"");
 }
@@ -238,13 +242,14 @@ if(sessionStorage.getItem(UNLOCK_KEY)==="1")showStats();
 async function loadStats(){
   var status=document.getElementById("statusText");var btn=document.getElementById("refreshBtn");
   status.textContent="불러오는 중…";btn.disabled=true;
-  ALL_EVENTS=[];
+  ALL_EVENTS=[];EXCLUDED_PRE_CUTOFF=0;
   try{
     // 전체를 한 번에, t 내림차순 limit 5000 (복합 인덱스 없이 단일 필드 정렬)
     var snap=await db.collection("oc_analytics").orderBy("t","desc").limit(5000).get();
     snap.forEach(function(doc){
       var d=doc.data();if(!d||!d.t||typeof d.t.toDate!=="function")return;
       var ds=kstDateStr(d.t.toDate());
+      if(ds<STATS_START_DS){EXCLUDED_PRE_CUTOFF++;return;}
       ALL_EVENTS.push({ds:ds,month:ds.slice(0,7),type:d.type||"",page:d.page||"",dev:d.dev||"",room:d.room||"",store:typeof d.store==="string"?d.store:"",members:Array.isArray(d.members)?d.members.slice():[],dt:d.t.toDate()});
     });
   }catch(ex){
@@ -255,14 +260,14 @@ async function loadStats(){
   renderFilterNote();renderCumulative();renderMonthly();renderGrowth();renderDaily();renderRecent();renderStoreStats();
   var datesAll=ALL_EVENTS.map(function(e){return e.ds;}).sort();
   var rangeTxt=datesAll.length?(datesAll[0]+" ~ "+datesAll[datesAll.length-1]):"데이터 없음";
-  status.textContent="전체 "+rangeTxt+" · 이벤트 "+fmt(ALL_EVENTS.length)+"건 (최대 5,000건 조회)";
+  status.textContent="관리 기간 "+STATS_START_DS+"부터 · 표시 범위 "+rangeTxt+" · 이벤트 "+fmt(ALL_EVENTS.length)+"건 (최대 5,000건 조회, 시작일 이전 "+fmt(EXCLUDED_PRE_CUTOFF)+"건 제외)";
   btn.disabled=false;
 }
 </script>
 <script>
 function renderFilterNote(){
   var el=document.getElementById("filterNote");if(!el)return;
-  el.textContent="테스트성 채널 "+fmt(EXCLUDED_ROOMS)+"개 제외 — 제출 인원이 전체 인원의 절반을 초과한 채널만 주문 관련 집계에 반영합니다. (접속 기기 수는 필터 없이 집계)";
+  el.textContent="2026-11-17 이전 기록 "+fmt(EXCLUDED_PRE_CUTOFF)+"건 제외 — 테스트로 보고 모든 집계에서 뺐습니다. 테스트성 채널 "+fmt(EXCLUDED_ROOMS)+"개 제외 — 제출 인원이 전체 인원의 절반을 초과한 채널만 주문 관련 집계에 반영합니다. (접속 기기 수는 절반 초과 필터 없이, 단 2026-11-17부터만 집계)";
   el.classList.remove("hidden");
 }
 function renderRecent(){
@@ -315,6 +320,7 @@ function renderStoreStats(){
 function renderCumulative(){
   var devs=new Set(),created=0,orders=0,skips=0,oldest="";
   ALL_EVENTS.forEach(function(e){
+    if(e.ds&&e.ds<STATS_START_DS)return;
     if(e.type==="pageview"&&e.dev)devs.add(e.dev);
     else if(e.type==="channel_created"&&isCounted(e))created++;
     else if(e.type==="order_submitted"&&isCounted(e))orders++;
@@ -326,7 +332,7 @@ function renderCumulative(){
     {label:"누적 취합 창 생성 수",num:fmt(created),unit:"회",cls:"alt"},
     {label:"누적 주문 제출 수<br>(최종 주문 기준)",num:fmt(orders),unit:"회",cls:""},
     {label:"누적 Skip 수",num:fmt(skips),unit:"회",cls:"alt"},
-    {label:"데이터 시작일<br>(가장 오래된 기록)",num:oldest||"-",unit:"",cls:"alt2",isDate:true}
+    {label:"데이터 시작일<br>(2026-11-17부터 · 가장 오래된 기록)",num:oldest||"-",unit:"",cls:"alt2",isDate:true}
   ];
   document.getElementById("cumulativeCards").innerHTML=cards.map(function(c){
     var numCls=c.isDate?"num date":"num";
@@ -338,6 +344,7 @@ function renderCumulative(){
 function renderMonthly(){
   var map={};
   ALL_EVENTS.forEach(function(e){
+    if(e.ds&&e.ds<STATS_START_DS)return;
     if(!map[e.month])map[e.month]={devs:new Set(),created:0,orders:0,skips:0};
     var m=map[e.month];
     if(e.type==="pageview"&&e.dev)m.devs.add(e.dev);
@@ -365,6 +372,7 @@ function renderGrowth(){
   var wrap=document.getElementById("growthWrap");
   var perDay={};
   ALL_EVENTS.forEach(function(e){
+    if(e.ds&&e.ds<STATS_START_DS)return;
     if(!perDay[e.ds])perDay[e.ds]={orders:0,created:0};
     if(e.type==="order_submitted"&&isCounted(e))perDay[e.ds].orders++;
     else if(e.type==="channel_created"&&isCounted(e))perDay[e.ds].created++;
@@ -405,7 +413,8 @@ function renderGrowth(){
 function renderDaily(){
   if(!ALL_LOADED)return;
   var days=parseInt(document.getElementById("periodSel").value,10)||30;
-  var dates=dateRange(days);
+  var dates=dateRange(days).filter(function(ds){return ds>=STATS_START_DS;});
+  if(!dates.length){dates=[STATS_START_DS];}
   var inPeriod=new Set(dates);
   var daily={};
   dates.forEach(function(ds){daily[ds]={createDevs:new Set(),orderDevs:new Set(),allDevs:new Set(),created:0,orders:0,skips:0};});
